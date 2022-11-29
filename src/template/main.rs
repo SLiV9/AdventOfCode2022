@@ -10,10 +10,7 @@ pub fn main()
 
 fn one(input: &str) -> i32
 {
-	input
-		.lines()
-		.map(|x| x.parse().unwrap())
-		.fold(0, |acc: i32, x: i32| acc + x)
+	0
 }
 
 fn two(_input: &str) -> i32
@@ -28,12 +25,6 @@ mod tests
 	use pretty_assertions::assert_eq;
 
 	const TEST: &str = include_str!("test.txt");
-
-	#[test]
-	fn one_provided()
-	{
-		assert_eq!(one("+1\n-2\n+3\n+1"), 3);
-	}
 
 	#[test]
 	fn one_test()
