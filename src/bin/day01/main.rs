@@ -8,7 +8,7 @@ pub fn main()
 	println!("Part Two: {}", two(INPUT));
 }
 
-pub fn one(input: &str) -> i32
+fn one(input: &str) -> i32
 {
 	input
 		.lines()
@@ -16,7 +16,7 @@ pub fn one(input: &str) -> i32
 		.fold(0, |acc: i32, x: i32| acc + x)
 }
 
-pub fn two(_input: &str) -> i32
+fn two(_input: &str) -> i32
 {
 	0
 }
