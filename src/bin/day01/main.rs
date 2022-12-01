@@ -35,9 +35,27 @@ fn one(input: &str) -> i32
 	max
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	let mut top_four: [i32; 4] = [0; 4];
+	let mut current: i32 = 0;
+	for line in input.lines()
+	{
+		if line.is_empty()
+		{
+			top_four[0] = current;
+			top_four.sort();
+			current = 0;
+		}
+		else
+		{
+			let calories: i32 = line.parse().unwrap();
+			current += calories;
+		}
+	}
+	top_four[0] = current;
+	top_four.sort();
+	top_four[1] + top_four[2] + top_four[3]
 }
 
 #[cfg(test)]
@@ -59,5 +77,17 @@ mod tests
 	fn one_test()
 	{
 		assert_eq!(one(TEST), 24001);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 45000);
+	}
+
+	#[test]
+	fn two_test()
+	{
+		assert_eq!(two(TEST), 59001);
 	}
 }
