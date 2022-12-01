@@ -19,14 +19,18 @@ fn one(input: &str) -> i32
 			if current > max
 			{
 				max = current;
-				current = 0;
 			}
+			current = 0;
 		}
 		else
 		{
 			let calories: i32 = line.parse().unwrap();
 			current += calories;
 		}
+	}
+	if current > max
+	{
+		max = current;
 	}
 	max
 }
@@ -43,10 +47,17 @@ mod tests
 	use pretty_assertions::assert_eq;
 
 	const PROVIDED: &str = include_str!("provided.txt");
+	const TEST: &str = include_str!("test.txt");
+
+	#[test]
+	fn one_provided()
+	{
+		assert_eq!(one(PROVIDED), 24000);
+	}
 
 	#[test]
 	fn one_test()
 	{
-		assert_eq!(one(PROVIDED), 24000);
+		assert_eq!(one(TEST), 24001);
 	}
 }
