@@ -37,6 +37,7 @@ impl Round
 #[derive(
 	Debug, Clone, Copy, parse_display::Display, parse_display::FromStr,
 )]
+#[repr(u8)]
 enum Opponent
 {
 	#[display("A")]
@@ -50,6 +51,7 @@ enum Opponent
 #[derive(
 	Debug, Clone, Copy, parse_display::Display, parse_display::FromStr,
 )]
+#[repr(u8)]
 enum Response
 {
 	#[display("X")]
@@ -73,12 +75,18 @@ impl Response
 	}
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(
+	parse_display::Display, parse_display::FromStr, Debug, Clone, Copy,
+)]
+#[repr(u8)]
 enum Outcome
 {
-	Loss,
-	Draw,
-	Win,
+	#[display("X")]
+	Loss = 0,
+	#[display("Y")]
+	Draw = 1,
+	#[display("Z")]
+	Win = 2,
 }
 
 impl Outcome
@@ -100,9 +108,36 @@ fn calculate_score(line: &str) -> i32
 	round.outcome().value() + round.response.value()
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	input.lines().map(|line| calculate_alternative(line)).sum()
+}
+
+#[derive(parse_display::Display, parse_display::FromStr)]
+#[display("{opponent} {outcome}")]
+struct AlternativeRound
+{
+	opponent: Opponent,
+	outcome: Outcome,
+}
+
+impl AlternativeRound
+{
+	fn response(&self) -> Response
+	{
+		match (3 + self.opponent as u8 + self.outcome as u8 - 1) % 3
+		{
+			0 => Response::Rock,
+			1 => Response::Paper,
+			_ => Response::Scissors,
+		}
+	}
+}
+
+fn calculate_alternative(line: &str) -> i32
+{
+	let round: AlternativeRound = line.parse().unwrap();
+	round.outcome.value() + round.response().value()
 }
 
 #[cfg(test)]
@@ -124,5 +159,17 @@ mod tests
 	fn one_test()
 	{
 		assert_eq!(one(TEST), 18 + 9 + 3 + 6 + 9);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 12);
+	}
+
+	#[test]
+	fn two_test()
+	{
+		assert_eq!(two(TEST), 18 + 9 + 3 + 6 + 9);
 	}
 }
