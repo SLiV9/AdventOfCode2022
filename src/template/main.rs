@@ -24,11 +24,11 @@ mod tests
 	use super::*;
 	use pretty_assertions::assert_eq;
 
-	const TEST: &str = include_str!("test.txt");
+	const PROVIDED: &str = include_str!("provided.txt");
 
 	#[test]
-	fn one_test()
+	fn one_provided()
 	{
-		assert_eq!(one(TEST), 4);
+		assert_eq!(one(PROVIDED), 4);
 	}
 }
