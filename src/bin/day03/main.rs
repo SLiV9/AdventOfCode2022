@@ -1,5 +1,7 @@
 /**/
 
+use itertools::Itertools;
+
 const INPUT: &str = include_str!("input.txt");
 
 pub fn main()
@@ -41,9 +43,17 @@ fn item_set_bitmask(compartment: &str) -> u64
 	})
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	input
+		.lines()
+		.chunks(3)
+		.into_iter()
+		.map(|group| {
+			group.fold(!0u64, |bitmask, line| bitmask & item_set_bitmask(line))
+		})
+		.map(|badge| 1 + badge.trailing_zeros() as i32)
+		.sum()
 }
 
 #[cfg(test)]
@@ -65,5 +75,11 @@ mod tests
 	fn one_test()
 	{
 		assert_eq!(one(TEST), 136);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 70);
 	}
 }
