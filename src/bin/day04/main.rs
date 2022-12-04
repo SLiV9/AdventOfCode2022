@@ -44,9 +44,24 @@ fn fully_contains(a: &Range, b: &Range) -> bool
 	(a.start..=a.end).contains(&b.start) && (a.start..=a.end).contains(&b.end)
 }
 
-fn two(_input: &str) -> i32
+fn overlap_either_way(pairing: &Pairing) -> bool
 {
-	0
+	// Overlap is symmetric.
+	overlap(&pairing.a, &pairing.b)
+}
+
+fn overlap(a: &Range, b: &Range) -> bool
+{
+	(a.start..=a.end).contains(&b.start) || (a.start..=a.end).contains(&b.end)
+}
+
+fn two(input: &str) -> usize
+{
+	input
+		.lines()
+		.map(|line| line.parse().unwrap())
+		.filter(|pairing| overlap_either_way(pairing))
+		.count()
 }
 
 #[cfg(test)]
@@ -61,5 +76,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 2);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 4);
 	}
 }
