@@ -46,11 +46,12 @@ fn fully_contains(a: &Range, b: &Range) -> bool
 
 fn overlap_either_way(pairing: &Pairing) -> bool
 {
-	// Overlap is symmetric.
-	overlap(&pairing.a, &pairing.b)
+	// Edge containment is NOT symmetric (e.g. 4-4 does not contain 1 or 9).
+	contains_edge(&pairing.a, &pairing.b)
+		|| contains_edge(&pairing.b, &pairing.a)
 }
 
-fn overlap(a: &Range, b: &Range) -> bool
+fn contains_edge(a: &Range, b: &Range) -> bool
 {
 	(a.start..=a.end).contains(&b.start) || (a.start..=a.end).contains(&b.end)
 }
