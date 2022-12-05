@@ -16,7 +16,20 @@ fn one(input: &str) -> String
 	let instructions = rest_of_input.lines().map(|line| line.parse().unwrap());
 	for instruction in instructions
 	{
-		ship.follow(instruction);
+		ship.follow_9000(instruction);
+	}
+	ship.get_message()
+}
+
+fn two(input: &str) -> String
+{
+	let (diagram, rest_of_input) = input.split_once("\n\n").unwrap();
+	let mut ship = Ship::new();
+	ship.fill(diagram);
+	let instructions = rest_of_input.lines().map(|line| line.parse().unwrap());
+	for instruction in instructions
+	{
+		ship.follow_9001(instruction);
 	}
 	ship.get_message()
 }
@@ -71,7 +84,7 @@ impl Ship
 		}
 	}
 
-	fn follow(&mut self, instruction: Instruction)
+	fn follow_9000(&mut self, instruction: Instruction)
 	{
 		let Instruction {
 			from_num,
@@ -94,6 +107,39 @@ impl Ship
 		}
 	}
 
+	fn follow_9001(&mut self, instruction: Instruction)
+	{
+		let Instruction {
+			from_num,
+			to_num,
+			amount,
+		} = instruction;
+		assert!(from_num >= 1 && from_num as usize <= self.width);
+		assert!(to_num >= 1 && to_num as usize <= self.width);
+		assert_ne!(from_num, to_num);
+		let from = from_num as usize - 1;
+		let to = to_num as usize - 1;
+		let n = amount as usize;
+		assert!(n >= 1);
+		let (left, right) = self.crates.split_at_mut(std::cmp::max(from, to));
+		let (from_stack, to_stack) = if from < to
+		{
+			(&mut left[from], &mut right[0])
+		}
+		else
+		{
+			(&mut right[0], &mut left[to])
+		};
+		let height_of_from = self.heights[from];
+		let height_of_to = self.heights[to];
+		assert!(height_of_from >= n);
+		let from_slice = &mut from_stack[(height_of_from - n)..height_of_from];
+		let to_slice = &mut to_stack[height_of_to..(height_of_to + n)];
+		from_slice.swap_with_slice(to_slice);
+		self.heights[from] -= n;
+		self.heights[to] += n;
+	}
+
 	fn get_message(&self) -> String
 	{
 		let top_crates: Vec<u8> = self.heights[0..self.width]
@@ -113,11 +159,6 @@ struct Instruction
 	from_num: i32,
 	to_num: i32,
 	amount: i32,
-}
-
-fn two(_input: &str) -> String
-{
-	String::new()
 }
 
 #[cfg(test)]
@@ -146,5 +187,23 @@ mod tests
 	fn one_once()
 	{
 		assert_eq!(&one(ONCE), "DCP");
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(&two(PROVIDED), "MCD");
+	}
+
+	#[test]
+	fn two_as_is()
+	{
+		assert_eq!(&two(AS_IS), "NDP");
+	}
+
+	#[test]
+	fn two_once()
+	{
+		assert_eq!(&two(ONCE), "DCP");
 	}
 }
