@@ -17,6 +17,15 @@ fn one(input: &str) -> usize
 		.count()
 }
 
+fn two(input: &str) -> usize
+{
+	input
+		.lines()
+		.map(|line| line.parse().unwrap())
+		.filter(|pairing| overlap_either_way(pairing))
+		.count()
+}
+
 #[derive(parse_display::Display, parse_display::FromStr)]
 #[display("{a},{b}")]
 struct Pairing
@@ -54,15 +63,6 @@ fn overlap_either_way(pairing: &Pairing) -> bool
 fn contains_edge(a: &Range, b: &Range) -> bool
 {
 	(a.start..=a.end).contains(&b.start) || (a.start..=a.end).contains(&b.end)
-}
-
-fn two(input: &str) -> usize
-{
-	input
-		.lines()
-		.map(|line| line.parse().unwrap())
-		.filter(|pairing| overlap_either_way(pairing))
-		.count()
 }
 
 #[cfg(test)]
