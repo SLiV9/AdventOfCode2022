@@ -10,13 +10,18 @@ pub fn main()
 
 fn one(input: &str) -> usize
 {
+	find_consecutive_unique(input, 4)
+}
+
+fn find_consecutive_unique(input: &str, num: usize) -> usize
+{
 	let (i, _window) = input
 		.as_bytes()
-		.windows(4)
+		.windows(num)
 		.enumerate()
 		.find(|(_i, window)| all_unique(window))
 		.unwrap();
-	4 + i
+	num + i
 }
 
 fn all_unique(code: &[u8]) -> bool
@@ -35,9 +40,9 @@ fn all_unique(code: &[u8]) -> bool
 	true
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> usize
 {
-	0
+	find_consecutive_unique(input, 14)
 }
 
 #[cfg(test)]
@@ -54,5 +59,15 @@ mod tests
 		assert_eq!(one("nppdvjthqldpwncqszvftbrmjlhg"), 6);
 		assert_eq!(one("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"), 10);
 		assert_eq!(one("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"), 11);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two("mjqjpqmgbljsphdztnvjfqwrcgsmlb"), 19);
+		assert_eq!(two("bvwbjplbgvbhsrlpgdmjqwftvncz"), 23);
+		assert_eq!(two("nppdvjthqldpwncqszvftbrmjlhg"), 23);
+		assert_eq!(two("nznrnfrfntjfmvfwmzdfjlvtqnbhcprsg"), 29);
+		assert_eq!(two("zcfzfwzzqfrljwzlrfnpqdbhtmscgvjw"), 26);
 	}
 }
