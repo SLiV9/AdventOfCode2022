@@ -23,10 +23,26 @@ fn one(input: &str) -> usize
 		.sum()
 }
 
-fn two(_input: &str) -> usize
+fn two(input: &str) -> usize
 {
-	0
+	let mut discovery = Discovery::new();
+	for line in input.lines().map(|line| line.parse().unwrap())
+	{
+		discovery.discover(line);
+	}
+	let filesystem = discovery.filesystem;
+	let current_free_space = TOTAL_DISK_SPACE - filesystem.total_size();
+	let extra_size_needed = NEEDED_FREE_DISK_SPACE - current_free_space;
+	filesystem
+		.directory_sizes
+		.into_values()
+		.filter(|size| *size >= extra_size_needed)
+		.min()
+		.unwrap()
 }
+
+const TOTAL_DISK_SPACE: usize = 70000000;
+const NEEDED_FREE_DISK_SPACE: usize = 30000000;
 
 #[derive(Debug)]
 struct Filesystem
@@ -57,6 +73,12 @@ impl Filesystem
 			let dsize = self.directory_sizes.get_mut(path).unwrap();
 			*dsize += size;
 		}
+	}
+
+	fn total_size(&self) -> usize
+	{
+		let root: std::path::PathBuf = "/".parse().unwrap();
+		self.directory_sizes.get(&root).unwrap().to_owned()
 	}
 }
 
@@ -146,5 +168,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 95437);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 24933642);
 	}
 }
