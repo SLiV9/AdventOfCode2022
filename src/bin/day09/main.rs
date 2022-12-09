@@ -13,7 +13,7 @@ pub fn main()
 fn one(input: &str) -> usize
 {
 	let instructions = input.lines().map(|x| x.parse().unwrap());
-	let mut simulation = Simulation::new();
+	let mut simulation: Simulation<2> = Simulation::new();
 	for instruction in instructions
 	{
 		simulation.follow(&instruction);
@@ -21,9 +21,15 @@ fn one(input: &str) -> usize
 	simulation.positions_visited_by_tail.len()
 }
 
-fn two(_input: &str) -> usize
+fn two(input: &str) -> usize
 {
-	0
+	let instructions = input.lines().map(|x| x.parse().unwrap());
+	let mut simulation: Simulation<10> = Simulation::new();
+	for instruction in instructions
+	{
+		simulation.follow(&instruction);
+	}
+	simulation.positions_visited_by_tail.len()
 }
 
 #[derive(Debug, parse_display::Display, parse_display::FromStr)]
@@ -34,7 +40,9 @@ struct Instruction
 	amount: usize,
 }
 
-#[derive(Debug, parse_display::Display, parse_display::FromStr)]
+#[derive(
+	Debug, Clone, Copy, parse_display::Display, parse_display::FromStr,
+)]
 enum Direction
 {
 	#[display("U")]
@@ -54,41 +62,55 @@ struct Position
 	y: i32,
 }
 
-struct Simulation
+impl Position
 {
-	head: Position,
-	tail: Position,
+	fn step(&mut self, direction: Direction)
+	{
+		match direction
+		{
+			Direction::Up => self.y -= 1,
+			Direction::Down => self.y += 1,
+			Direction::Left => self.x -= 1,
+			Direction::Right => self.x += 1,
+		}
+	}
+
+	fn stay_attached_to(&mut self, head: Position)
+	{
+		let dx = head.x - self.x;
+		let dy = head.y - self.y;
+		let (dx, dy) = simulate_slack(dx, dy);
+		self.x += dx;
+		self.y += dy;
+	}
+}
+
+struct Simulation<const N: usize>
+{
+	knots: [Position; N],
 	positions_visited_by_tail: HashSet<Position>,
 }
 
-impl Simulation
+impl<const N: usize> Simulation<N>
 {
-	fn new() -> Simulation
+	fn new() -> Simulation<N>
 	{
 		Simulation {
-			head: Position::default(),
-			tail: Position::default(),
+			knots: [Position::default(); N],
 			positions_visited_by_tail: HashSet::from([Position::default()]),
 		}
 	}
 
 	fn follow(&mut self, instruction: &Instruction)
 	{
-		for _i in 0..instruction.amount
+		for _t in 0..instruction.amount
 		{
-			match instruction.direction
+			self.knots[0].step(instruction.direction);
+			for i in 1..N
 			{
-				Direction::Up => self.head.y -= 1,
-				Direction::Down => self.head.y += 1,
-				Direction::Left => self.head.x -= 1,
-				Direction::Right => self.head.x += 1,
+				self.knots[i].stay_attached_to(self.knots[i - 1]);
 			}
-			let dx = self.head.x - self.tail.x;
-			let dy = self.head.y - self.tail.y;
-			let (dx, dy) = simulate_slack(dx, dy);
-			self.tail.x += dx;
-			self.tail.y += dy;
-			self.positions_visited_by_tail.insert(self.tail);
+			self.positions_visited_by_tail.insert(self.knots[N - 1]);
 		}
 	}
 }
@@ -137,10 +159,23 @@ mod tests
 	use pretty_assertions::assert_eq;
 
 	const PROVIDED: &str = include_str!("provided.txt");
+	const LARGER: &str = include_str!("larger.txt");
 
 	#[test]
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 13);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 1);
+	}
+
+	#[test]
+	fn two_larger()
+	{
+		assert_eq!(two(LARGER), 36);
 	}
 }
