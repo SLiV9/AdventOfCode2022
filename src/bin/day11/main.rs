@@ -41,7 +41,7 @@ impl std::str::FromStr for KeepAway
 	{
 		let monkey_regex = regex::Regex::new(MONKEY_REGEX).unwrap();
 		let items_regex = regex::Regex::new("[0-9]+").unwrap();
-		let monkeys = input
+		let monkeys: Vec<Monkey> = input
 			.split("\n\n")
 			.map(|segment| {
 				let captures = monkey_regex.captures(segment).unwrap();
@@ -59,6 +59,12 @@ impl std::str::FromStr for KeepAway
 				}
 			})
 			.collect();
+		// Do not allow monkeys to throw to themselves to avoid infinite loops.
+		for (i, monkey) in monkeys.iter().enumerate()
+		{
+			assert_ne!(monkey.spec.true_friend, i);
+			assert_ne!(monkey.spec.false_friend, i);
+		}
 		Ok(Self { monkeys })
 	}
 }
@@ -67,7 +73,26 @@ impl KeepAway
 {
 	fn play_round(&mut self)
 	{
-		unimplemented!()
+		let mut air = Vec::new();
+		for i in 0..self.monkeys.len()
+		{
+			std::mem::swap(&mut air, &mut self.monkeys[i].items);
+			self.monkeys[i].number_of_inspections += air.len();
+			for old in air.drain(..)
+			{
+				let spec = &mut self.monkeys[i].spec;
+				let new = spec.operation.perform(old) / 3;
+				let to = if new % spec.test_divisor == 0
+				{
+					spec.true_friend
+				}
+				else
+				{
+					spec.false_friend
+				};
+				self.monkeys[to].items.push(new);
+			}
+		}
 	}
 
 	fn level_of_monkey_business(&self) -> usize
@@ -124,6 +149,28 @@ struct Operation
 	right: Operand,
 }
 
+impl Operation
+{
+	fn perform(&self, old: i32) -> i32
+	{
+		let left = match self.left
+		{
+			Operand::Old => old,
+			Operand::Value(x) => x,
+		};
+		let right = match self.right
+		{
+			Operand::Old => old,
+			Operand::Value(x) => x,
+		};
+		match self.op
+		{
+			Operator::Plus => left + right,
+			Operator::Times => left * right,
+		}
+	}
+}
+
 #[derive(Debug, parse_display::Display, parse_display::FromStr)]
 enum Operand
 {
@@ -166,34 +213,6 @@ mod tests
 		let output = format!("{}", spec);
 		let spec2: Specification = output.parse().unwrap();
 		let output2 = format!("{}", spec2);
-		assert_eq!(&output, &output2);
-	}
-
-	#[test]
-	fn parse_operation()
-	{
-		let text = "old * 19";
-		let operation = Operation {
-			left: Operand::Old,
-			op: Operator::Times,
-			right: Operand::Value(19),
-		};
-		let output = format!("{}", operation);
-		assert_eq!(&output, text);
-		let operation2: Operation = output.parse().unwrap();
-		let output2 = format!("{}", operation2);
-		assert_eq!(&output, &output2);
-	}
-
-	#[test]
-	fn parse_operator()
-	{
-		let text = "*";
-		let operator = Operator::Times;
-		let output = format!("{}", operator);
-		assert_eq!(&output, text);
-		let operator2: Operator = output.parse().unwrap();
-		let output2 = format!("{}", operator2);
 		assert_eq!(&output, &output2);
 	}
 
