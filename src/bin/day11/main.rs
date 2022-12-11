@@ -11,6 +11,7 @@ pub fn main()
 fn one(input: &str) -> usize
 {
 	let mut game: KeepAway = input.parse().unwrap();
+	game.is_manageable = true;
 	for _i in 0..20
 	{
 		game.play_round();
@@ -18,15 +19,22 @@ fn one(input: &str) -> usize
 	game.level_of_monkey_business()
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> usize
 {
-	0
+	let mut game: KeepAway = input.parse().unwrap();
+	for _i in 0..10000
+	{
+		game.play_round();
+	}
+	game.level_of_monkey_business()
 }
 
 #[derive(Debug)]
 struct KeepAway
 {
 	monkeys: Vec<Monkey>,
+	is_manageable: bool,
+	base: i64,
 }
 
 const MONKEY_REGEX: &str = "Monkey [0-9]+:
@@ -46,7 +54,7 @@ impl std::str::FromStr for KeepAway
 			.map(|segment| {
 				let captures = monkey_regex.captures(segment).unwrap();
 				let items_str = captures.name("items").unwrap();
-				let items: Vec<i32> = items_regex
+				let items: Vec<i64> = items_regex
 					.captures_iter(items_str.as_str())
 					.map(|x| x.get(0).unwrap().as_str().parse().unwrap())
 					.collect();
@@ -60,12 +68,18 @@ impl std::str::FromStr for KeepAway
 			})
 			.collect();
 		// Do not allow monkeys to throw to themselves to avoid infinite loops.
+		let mut base = 1;
 		for (i, monkey) in monkeys.iter().enumerate()
 		{
 			assert_ne!(monkey.spec.true_friend, i);
 			assert_ne!(monkey.spec.false_friend, i);
+			base *= monkey.spec.test_divisor;
 		}
-		Ok(Self { monkeys })
+		Ok(Self {
+			monkeys,
+			is_manageable: false,
+			base,
+		})
 	}
 }
 
@@ -81,8 +95,16 @@ impl KeepAway
 			for old in air.drain(..)
 			{
 				let spec = &mut self.monkeys[i].spec;
-				let new = spec.operation.perform(old) / 3;
-				let to = if new % spec.test_divisor == 0
+				let new = spec.operation.perform(old);
+				let item = if self.is_manageable
+				{
+					new / 3
+				}
+				else
+				{
+					new % self.base
+				};
+				let to = if item % spec.test_divisor == 0
 				{
 					spec.true_friend
 				}
@@ -90,7 +112,7 @@ impl KeepAway
 				{
 					spec.false_friend
 				};
-				self.monkeys[to].items.push(new);
+				self.monkeys[to].items.push(item);
 			}
 		}
 	}
@@ -119,7 +141,7 @@ impl KeepAway
 #[derive(Debug)]
 struct Monkey
 {
-	items: Vec<i32>,
+	items: Vec<i64>,
 	spec: Specification,
 
 	number_of_inspections: usize,
@@ -135,7 +157,7 @@ struct Monkey
 struct Specification
 {
 	operation: Operation,
-	test_divisor: i32,
+	test_divisor: i64,
 	true_friend: usize,
 	false_friend: usize,
 }
@@ -151,7 +173,7 @@ struct Operation
 
 impl Operation
 {
-	fn perform(&self, old: i32) -> i32
+	fn perform(&self, old: i64) -> i64
 	{
 		let left = match self.left
 		{
@@ -177,7 +199,7 @@ enum Operand
 	#[display("old")]
 	Old,
 	#[display("{0}")]
-	Value(i32),
+	Value(i64),
 }
 
 #[derive(Debug, parse_display::Display, parse_display::FromStr)]
@@ -220,5 +242,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 10605);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 2713310158);
 	}
 }
