@@ -10,6 +10,16 @@ pub fn main()
 
 fn one(input: &str) -> usize
 {
+	solve(input, false)
+}
+
+fn two(input: &str) -> usize
+{
+	solve(input, true)
+}
+
+fn solve(input: &str, is_part_two: bool) -> usize
+{
 	let num_rows = input.lines().count();
 	let num_cols = input.lines().next().unwrap().len();
 	let num_cells = num_rows * num_cols;
@@ -32,6 +42,11 @@ fn one(input: &str) -> usize
 			let current_height = match data[from]
 			{
 				b'S' =>
+				{
+					println!("Grid:\n{}", std::str::from_utf8(&grid).unwrap());
+					return step;
+				}
+				b'a' if is_part_two =>
 				{
 					println!("Grid:\n{}", std::str::from_utf8(&grid).unwrap());
 					return step;
@@ -89,11 +104,6 @@ fn one(input: &str) -> usize
 	unreachable!()
 }
 
-fn two(_input: &str) -> i32
-{
-	0
-}
-
 #[cfg(test)]
 mod tests
 {
@@ -106,5 +116,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 31);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 29);
 	}
 }
