@@ -21,9 +21,24 @@ fn one(input: &str) -> usize
 		.sum()
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> usize
 {
-	0
+	// We can cheat a litte: we only need to know the indices of the dividers,
+	// so we can instead just calculate the number of lines that are earlier.
+	let mut num_less_than_2 = 0;
+	let mut num_between = 0;
+	for line in input.lines().filter(|x| !x.is_empty())
+	{
+		match compare_to_range(line, 2, 6)
+		{
+			Ordering::Less => num_less_than_2 += 1,
+			Ordering::Equal => num_between += 1,
+			Ordering::Greater => (),
+		}
+	}
+	let offset_of_2 = 1 + num_less_than_2;
+	let offset_of_6 = offset_of_2 + num_between + 1;
+	offset_of_2 * offset_of_6
 }
 
 fn separate_package_inputs(input: &str) -> (&str, &str)
@@ -42,6 +57,24 @@ fn are_in_right_order(left: &str, right: &str) -> bool
 		Ordering::Less => true,
 		Ordering::Greater => false,
 		Ordering::Equal => unreachable!(),
+	}
+}
+
+fn compare_to_range(line: &str, lower: i32, upper: i32) -> Ordering
+{
+	match compare_1(lower, &mut parse_tokens(line).skip(1)).reverse()
+	{
+		Ordering::Less => Ordering::Less,
+		Ordering::Greater =>
+		{
+			match compare_1(upper, &mut parse_tokens(line).skip(1)).reverse()
+			{
+				Ordering::Less => Ordering::Equal,
+				Ordering::Greater => Ordering::Greater,
+				Ordering::Equal => Ordering::Equal,
+			}
+		}
+		Ordering::Equal => Ordering::Equal,
 	}
 }
 
@@ -191,5 +224,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 13);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 140);
 	}
 }
