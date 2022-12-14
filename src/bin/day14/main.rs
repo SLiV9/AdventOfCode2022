@@ -16,9 +16,13 @@ fn one(input: &str) -> usize
 	cave.count_sand()
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> usize
 {
-	0
+	let mut cave = Cave::new();
+	cave.build(input);
+	cave.build_floor();
+	cave.fill();
+	cave.count_sand()
 }
 
 const WIDTH: usize = 1000;
@@ -30,6 +34,7 @@ struct Cave
 	// As a micro-optimization, use column-major order because it might make
 	// dropping sand multiple tiles slightly faster.
 	grid_xy: [[u8; HEIGHT]; WIDTH],
+	max_y_of_rock: usize,
 }
 
 impl Cave
@@ -38,6 +43,7 @@ impl Cave
 	{
 		Cave {
 			grid_xy: [[b' '; HEIGHT]; WIDTH],
+			max_y_of_rock: 0,
 		}
 	}
 
@@ -65,6 +71,10 @@ impl Cave
 						{
 							self.grid_xy[x][y] = b'#';
 						}
+						if y > self.max_y_of_rock
+						{
+							self.max_y_of_rock = y;
+						}
 					}
 					else if from.x == to.x
 					{
@@ -79,6 +89,10 @@ impl Cave
 						{
 							self.grid_xy[x][y] = b'#';
 						}
+						if y1 > self.max_y_of_rock
+						{
+							self.max_y_of_rock = y1;
+						}
 					}
 					else
 					{
@@ -87,6 +101,16 @@ impl Cave
 					from = to;
 				}
 			}
+		}
+	}
+
+	fn build_floor(&mut self)
+	{
+		let y = 2 + self.max_y_of_rock;
+		assert!(y < HEIGHT);
+		for x in 0..WIDTH
+		{
+			self.grid_xy[x][y] = b'=';
 		}
 	}
 
@@ -101,9 +125,12 @@ impl Cave
 	fn drop_grain(&mut self) -> Option<Position>
 	{
 		let mut pos = Position { x: 500, y: 0 };
+		if self.grid_xy[pos.x][pos.y] != b' '
+		{
+			return None;
+		}
 		while pos.y + 1 < HEIGHT
 		{
-			//dbg!(&pos);
 			if self.grid_xy[pos.x][pos.y + 1] == b' '
 			{
 				pos.y += 1;
@@ -157,5 +184,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 24);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 93);
 	}
 }
