@@ -33,43 +33,52 @@ fn two(input: &str, height: i32) -> u64
 		.map(|line| line.parse().unwrap())
 		.map(|reading: Reading| reading.into())
 		.collect();
-	let signal = do_edge_search(height, &sensors);
+	let signal = do_line_search(height, &sensors);
 	dbg!(signal);
 	(signal.x as u64) * (REAL_SCALE as u64) + (signal.y as u64)
 }
 
-fn do_edge_search(scope: i32, sensors: &[Diamond]) -> Position
+fn do_line_search(scope: i32, sensors: &[Diamond]) -> Position
 {
 	// We know that there is exactly one solution, so it must be on the outer
 	// edge of the range of two or more sensors.
-	for traversed in sensors
+	// In fact it must be on the intersection of two sensors; even though not
+	// all sensors touching it need to intersect, it cannot be that there are
+	// only two non-intersecting sensors that touch it, because then there
+	// would be more solutions on a line.
+	// Because the sensor ranges are diamonds, the edges are diagonal lines.
+	// So we can just check the intersections of all those diagonals.
+	let mut ascenders: Vec<i32> = sensors
+		.iter()
+		.flat_map(|sensor| {
+			let x0 = sensor.center.x - sensor.range - 1;
+			let x1 = sensor.center.x + sensor.range + 1;
+			let y = sensor.center.y;
+			// The ascenders are given by {x = K + C, y = K}
+			// so if y == K and x0 == K + C then C == x0 - y.
+			[x0 - y, x1 - y]
+		})
+		.collect();
+	ascenders.sort();
+	ascenders.dedup();
+	let mut descenders: Vec<i32> = sensors
+		.iter()
+		.flat_map(|sensor| {
+			let x0 = sensor.center.x - sensor.range - 1;
+			let x1 = sensor.center.x + sensor.range + 1;
+			let y = sensor.center.y;
+			// The ascenders are given by {x = K + C, y = -K}
+			// so if y == -K and x0 == K + C then C == x0 - -y.
+			[x0 + y, x1 + y]
+		})
+		.collect();
+	descenders.sort();
+	descenders.dedup();
+	for ascender in ascenders
 	{
-		// Traverse the outer edge of this diamond.
-		//   2
-		//  1x3
-		// 0xxx7
-		//  4x6
-		//   5
-		let n = traversed.range + 1;
-		let nw_edge = (0..n).map(|i| Position {
-			x: traversed.center.x - n + i,
-			y: traversed.center.y - i,
-		});
-		let ne_edge = (0..n).map(|i| Position {
-			x: traversed.center.x + i,
-			y: traversed.center.y - n + i,
-		});
-		let sw_edge = (0..n).map(|i| Position {
-			x: traversed.center.x - n + 1 + i,
-			y: traversed.center.y + 1 + i,
-		});
-		let se_edge = (0..n).map(|i| Position {
-			x: traversed.center.x + 1 + i,
-			y: traversed.center.y + n - 1 - i,
-		});
-		let outer_edge = nw_edge.chain(ne_edge).chain(sw_edge).chain(se_edge);
-		for pos in outer_edge
+		for descender in &descenders
 		{
+			let pos = intersect_diagonals(ascender, *descender);
 			if pos.x < 0 || pos.x > scope || pos.y < 0 || pos.y > scope
 			{
 				continue;
@@ -81,6 +90,21 @@ fn do_edge_search(scope: i32, sensors: &[Diamond]) -> Position
 		}
 	}
 	unreachable!()
+}
+
+fn intersect_diagonals(
+	ascender_origin_x: i32,
+	descender_origin_x: i32,
+) -> Position
+{
+	let a = ascender_origin_x;
+	let d = descender_origin_x;
+	// They intersect where a + K == d + N and K == -N.
+	// Hence a + K == d - K.
+	// Hence a + 2K == d.
+	// Hence:
+	let k = (d - a) / 2;
+	Position { x: a + k, y: k }
 }
 
 #[derive(Debug, Clone, Copy)]
