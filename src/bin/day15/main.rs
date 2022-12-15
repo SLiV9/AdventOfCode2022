@@ -28,87 +28,56 @@ fn one(input: &str, height: i32) -> usize
 
 fn two(input: &str, height: i32) -> i32
 {
-	let center = Position {
-		x: height / 2,
-		y: height / 2,
-	};
 	let sensors: Vec<Diamond> = input
 		.lines()
 		.map(|line| line.parse().unwrap())
 		.map(|reading: Reading| reading.into())
 		.collect();
-	let signal = do_diamond_quad_search(center, height, &sensors);
+	let signal = do_edge_search(height, &sensors);
 	dbg!(signal);
 	signal.x * REAL_SCALE + signal.y
 }
 
-fn do_diamond_quad_search(
-	center: Position,
-	scope: i32,
-	sensors: &[Diamond],
-) -> Position
+fn do_edge_search(scope: i32, sensors: &[Diamond]) -> Position
 {
-	let area = Diamond {
-		center,
-		range: (scope as u32).next_power_of_two() as i32,
-	};
-	let mut queue = std::collections::VecDeque::<Diamond>::new();
-	queue.push_back(area);
-	while let Some(area) = queue.pop_front()
+	// We know that there is exactly one solution, so it must be on the outer
+	// edge of the range of two or more sensors.
+	for traversed in sensors
 	{
-		let is_entirely_out_of_scope = area.center.x + area.range < 0
-			|| area.center.x - area.range > scope
-			|| area.center.y + area.range < 0
-			|| area.center.y - area.range > scope;
-		if is_entirely_out_of_scope
+		// Traverse the outer edge of this diamond.
+		//   2
+		//  1x3
+		// 0xxx7
+		//  4x6
+		//   5
+		let n = traversed.range + 1;
+		let nw_edge = (0..n).map(|i| Position {
+			x: traversed.center.x - n + i,
+			y: traversed.center.x - i,
+		});
+		let ne_edge = (0..n).map(|i| Position {
+			x: traversed.center.x + i,
+			y: traversed.center.x - n + i,
+		});
+		let sw_edge = (0..n).map(|i| Position {
+			x: traversed.center.x - n + i,
+			y: traversed.center.x + i,
+		});
+		let se_edge = (0..n).map(|i| Position {
+			x: traversed.center.x + i,
+			y: traversed.center.x + n - i,
+		});
+		let outer_edge = nw_edge.chain(ne_edge).chain(sw_edge).chain(se_edge);
+		for pos in outer_edge
 		{
-			continue;
-		}
-
-		if area.range <= 2
-		{
-			let x0 = std::cmp::max(0, area.center.x - area.range);
-			let x1 = std::cmp::min(area.center.x + area.range, scope);
-			let y0 = std::cmp::max(0, area.center.y - area.range);
-			let y1 = std::cmp::min(area.center.y + area.range, scope);
-			for y in y0..=y1
+			if pos.x < 0 || pos.x > scope || pos.y < 0 || pos.y > scope
 			{
-				for x in x0..=x1
-				{
-					let pos = Position { x, y };
-					let out_of_range = sensors.iter().all(|sensor| {
-						manhattan_distance(sensor.center, pos) > sensor.range
-					});
-					if out_of_range
-					{
-						dbg!(area);
-						return pos;
-					}
-				}
+				continue;
 			}
-			continue;
-		}
-
-		let is_entirely_in_range =
-			sensors.iter().any(|sensor| sensor.contains(area));
-		if is_entirely_in_range
-		{
-			continue;
-		}
-
-		let subareas = [(1, 0), (-1, 0), (0, -1), (0, -1)]
-			.into_iter()
-			.map(|(dx, dy)| Position {
-				x: area.center.x + dx * area.range / 2,
-				y: area.center.y + dy * area.range / 2,
-			})
-			.map(|center| Diamond {
-				center,
-				range: area.range / 2,
-			});
-		for subarea in subareas
-		{
-			queue.push_back(subarea);
+			if !sensors.iter().any(|sensor| sensor.contains(pos))
+			{
+				return pos;
+			}
 		}
 	}
 	unreachable!()
@@ -123,9 +92,9 @@ struct Diamond
 
 impl Diamond
 {
-	fn contains(&self, other: Diamond) -> bool
+	fn contains(&self, pos: Position) -> bool
 	{
-		manhattan_distance(self.center, other.center) + other.range < self.range
+		manhattan_distance(self.center, pos) <= self.range
 	}
 }
 
