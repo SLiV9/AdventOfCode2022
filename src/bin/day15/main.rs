@@ -2,14 +2,17 @@
 
 const INPUT: &str = include_str!("input.txt");
 
+const REAL_SCALE: i32 = 4000000;
+
 pub fn main()
 {
-	println!("Part One: {}", one(INPUT, 2000000));
-	println!("Part Two: {}", two(INPUT));
+	println!("Part One: {}", one(INPUT, REAL_SCALE));
+	println!("Part Two: {}", two(INPUT, REAL_SCALE));
 }
 
-fn one(input: &str, scanline_y: i32) -> usize
+fn one(input: &str, height: i32) -> usize
 {
+	let scanline_y = height / 2;
 	// Collect ranges where the sensor range overlaps the scan line.
 	let mut scan_ranges: Vec<Range> = input
 		.lines()
@@ -23,9 +26,119 @@ fn one(input: &str, scanline_y: i32) -> usize
 	count_deduplicated_ranges(scan_ranges)
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str, height: i32) -> i32
 {
-	0
+	let center = Position {
+		x: height / 2,
+		y: height / 2,
+	};
+	let sensors: Vec<Diamond> = input
+		.lines()
+		.map(|line| line.parse().unwrap())
+		.map(|reading: Reading| reading.into())
+		.collect();
+	let signal = do_diamond_quad_search(center, height, &sensors);
+	dbg!(signal);
+	signal.x * REAL_SCALE + signal.y
+}
+
+fn do_diamond_quad_search(
+	center: Position,
+	scope: i32,
+	sensors: &[Diamond],
+) -> Position
+{
+	let area = Diamond {
+		center,
+		range: (scope as u32).next_power_of_two() as i32,
+	};
+	let mut queue = std::collections::VecDeque::<Diamond>::new();
+	queue.push_back(area);
+	while let Some(area) = queue.pop_front()
+	{
+		let is_entirely_out_of_scope = area.center.x + area.range < 0
+			|| area.center.x - area.range > scope
+			|| area.center.y + area.range < 0
+			|| area.center.y - area.range > scope;
+		if is_entirely_out_of_scope
+		{
+			continue;
+		}
+
+		if area.range <= 2
+		{
+			let x0 = std::cmp::max(0, area.center.x - area.range);
+			let x1 = std::cmp::min(area.center.x + area.range, scope);
+			let y0 = std::cmp::max(0, area.center.y - area.range);
+			let y1 = std::cmp::min(area.center.y + area.range, scope);
+			for y in y0..=y1
+			{
+				for x in x0..=x1
+				{
+					let pos = Position { x, y };
+					let out_of_range = sensors.iter().all(|sensor| {
+						manhattan_distance(sensor.center, pos) > sensor.range
+					});
+					if out_of_range
+					{
+						dbg!(area);
+						return pos;
+					}
+				}
+			}
+			continue;
+		}
+
+		let is_entirely_in_range =
+			sensors.iter().any(|sensor| sensor.contains(area));
+		if is_entirely_in_range
+		{
+			continue;
+		}
+
+		let subareas = [(1, 0), (-1, 0), (0, -1), (0, -1)]
+			.into_iter()
+			.map(|(dx, dy)| Position {
+				x: area.center.x + dx * area.range / 2,
+				y: area.center.y + dy * area.range / 2,
+			})
+			.map(|center| Diamond {
+				center,
+				range: area.range / 2,
+			});
+		for subarea in subareas
+		{
+			queue.push_back(subarea);
+		}
+	}
+	unreachable!()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Diamond
+{
+	center: Position,
+	range: i32,
+}
+
+impl Diamond
+{
+	fn contains(&self, other: Diamond) -> bool
+	{
+		manhattan_distance(self.center, other.center) + other.range < self.range
+	}
+}
+
+impl From<Reading> for Diamond
+{
+	fn from(reading: Reading) -> Diamond
+	{
+		let range = manhattan_distance(reading.sensor, reading.beacon);
+		Diamond {
+			center: reading.sensor,
+			range,
+		}
+	}
 }
 
 #[derive(Debug, parse_display::Display, parse_display::FromStr)]
@@ -156,6 +269,12 @@ mod tests
 	#[test]
 	fn one_provided()
 	{
-		assert_eq!(one(PROVIDED, 10), 26);
+		assert_eq!(one(PROVIDED, 20), 26);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED, 20), 56000011);
 	}
 }
