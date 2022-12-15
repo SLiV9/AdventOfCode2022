@@ -26,7 +26,7 @@ fn one(input: &str, height: i32) -> usize
 	count_deduplicated_ranges(scan_ranges)
 }
 
-fn two(input: &str, height: i32) -> i32
+fn two(input: &str, height: i32) -> u64
 {
 	let sensors: Vec<Diamond> = input
 		.lines()
@@ -35,7 +35,7 @@ fn two(input: &str, height: i32) -> i32
 		.collect();
 	let signal = do_edge_search(height, &sensors);
 	dbg!(signal);
-	signal.x * REAL_SCALE + signal.y
+	(signal.x as u64) * (REAL_SCALE as u64) + (signal.y as u64)
 }
 
 fn do_edge_search(scope: i32, sensors: &[Diamond]) -> Position
@@ -53,19 +53,19 @@ fn do_edge_search(scope: i32, sensors: &[Diamond]) -> Position
 		let n = traversed.range + 1;
 		let nw_edge = (0..n).map(|i| Position {
 			x: traversed.center.x - n + i,
-			y: traversed.center.x - i,
+			y: traversed.center.y - i,
 		});
 		let ne_edge = (0..n).map(|i| Position {
 			x: traversed.center.x + i,
-			y: traversed.center.x - n + i,
+			y: traversed.center.y - n + i,
 		});
 		let sw_edge = (0..n).map(|i| Position {
-			x: traversed.center.x - n + i,
-			y: traversed.center.x + i,
+			x: traversed.center.x - n + 1 + i,
+			y: traversed.center.y + 1 + i,
 		});
 		let se_edge = (0..n).map(|i| Position {
-			x: traversed.center.x + i,
-			y: traversed.center.x + n - i,
+			x: traversed.center.x + 1 + i,
+			y: traversed.center.y + n - 1 - i,
 		});
 		let outer_edge = nw_edge.chain(ne_edge).chain(sw_edge).chain(se_edge);
 		for pos in outer_edge
