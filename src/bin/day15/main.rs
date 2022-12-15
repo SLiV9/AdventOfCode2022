@@ -7,6 +7,10 @@ const REAL_SCALE: i32 = 4000000;
 pub fn main()
 {
 	println!("Part One: {}", one(INPUT, REAL_SCALE));
+	//for _ in 0..999
+	//{
+	//	two(INPUT, REAL_SCALE);
+	//}
 	println!("Part Two: {}", two(INPUT, REAL_SCALE));
 }
 
@@ -48,6 +52,9 @@ fn do_line_search(scope: i32, sensors: &[Diamond]) -> Position
 	// would be more solutions on a line.
 	// Because the sensor ranges are diamonds, the edges are diagonal lines.
 	// So we can just check the intersections of all those diagonals.
+	// In fact because there cannot be more solutions "behind" the edge, it has
+	// to be the intersection of two diagonals that are each parallel to at
+	// least one sensor edge on either side.
 	let mut ascenders: Vec<i32> = sensors
 		.iter()
 		.flat_map(|sensor| {
@@ -60,7 +67,6 @@ fn do_line_search(scope: i32, sensors: &[Diamond]) -> Position
 		})
 		.collect();
 	ascenders.sort();
-	ascenders.dedup();
 	let mut descenders: Vec<i32> = sensors
 		.iter()
 		.flat_map(|sensor| {
@@ -73,6 +79,26 @@ fn do_line_search(scope: i32, sensors: &[Diamond]) -> Position
 		})
 		.collect();
 	descenders.sort();
+	// Filter out non-duplicate entries and keep only the duplicates.
+	let mut ascenders: Vec<i32> = ascenders
+		.windows(2)
+		.filter_map(|window| match window
+		{
+			[a, b] if a == b => Some(*a),
+			[_, _] => None,
+			_ => unreachable!(),
+		})
+		.collect();
+	let mut descenders: Vec<i32> = descenders
+		.windows(2)
+		.filter_map(|window| match window
+		{
+			[a, b] if a == b => Some(*a),
+			[_, _] => None,
+			_ => unreachable!(),
+		})
+		.collect();
+	ascenders.dedup();
 	descenders.dedup();
 	for ascender in ascenders
 	{
