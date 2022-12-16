@@ -1,0 +1,23 @@
+graph
+{
+AA -- DD
+AA -- II
+AA -- BB
+BB -- CC
+BB -- AA
+CC -- DD
+CC -- BB
+DD -- CC
+DD -- AA
+DD -- EE
+EE -- FF
+EE -- DD
+FF -- EE
+FF -- GG
+GG -- FF
+GG -- HH
+HH -- GG
+II -- AA
+II -- JJ
+JJ -- II
+}
