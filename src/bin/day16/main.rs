@@ -12,15 +12,39 @@ fn one(input: &str) -> i32
 {
 	let mut cave = parse_input(input);
 	sort_and_filter_valves(&mut cave);
-	calculate_max_total_pressure(&cave)
+	let starting_position = cave.starting_position() as u8;
+	let initial_state = State {
+		is_open: 0,
+		time_remaining_for_traveler: MAX_TIME,
+		time_remaining_for_elephant: 0,
+		traveler_position: starting_position,
+		elephant_position: starting_position,
+		total_pressure_added: 0,
+		greedy_lower_bound: 0,
+		loose_upper_bound: 0,
+	};
+	calculate_max_total_pressure(&cave, initial_state)
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	let mut cave = parse_input(input);
+	sort_and_filter_valves(&mut cave);
+	let starting_position = cave.starting_position() as u8;
+	let initial_state = State {
+		is_open: 0,
+		time_remaining_for_traveler: MAX_TIME - 4,
+		time_remaining_for_elephant: MAX_TIME - 4,
+		traveler_position: starting_position,
+		elephant_position: starting_position,
+		total_pressure_added: 0,
+		greedy_lower_bound: 0,
+		loose_upper_bound: 0,
+	};
+	calculate_max_total_pressure(&cave, initial_state)
 }
 
-const MAX_TIME: i16 = 30;
+const MAX_TIME: i8 = 30;
 const MAX_VALVES: usize = 128;
 
 #[derive(Debug)]
@@ -43,16 +67,8 @@ impl Cave
 	}
 }
 
-fn calculate_max_total_pressure(cave: &Cave) -> i32
+fn calculate_max_total_pressure(cave: &Cave, mut initial_state: State) -> i32
 {
-	let mut initial_state = State {
-		is_open: 0,
-		time_remaining: MAX_TIME,
-		position: cave.starting_position() as u8,
-		total_pressure_added: 0,
-		greedy_lower_bound: 0,
-		loose_upper_bound: 0,
-	};
 	initial_state.perform_heuristics(cave);
 	let mut queue: Vec<State> = Vec::new();
 	queue.push(initial_state);
@@ -68,55 +84,51 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 
 		for i in 0..cave.num_valves
 		{
-			let distance = cave.distance[current.position as usize][i];
-			let time_needed = distance as i16 + 1;
+			if current.time_remaining_for_traveler == 0
+			{
+				break;
+			}
+			let distance = cave.distance[current.traveler_position as usize][i];
+			let time_needed = distance as i8 + 1;
 			if distance > 0
-				&& current.time_remaining >= time_needed
+				&& current.time_remaining_for_traveler >= time_needed
 				&& !current.has_been_opened(i as u8)
 			{
 				let mut next: State = current;
 				next.travel(i as u8, cave);
 				next.open(cave);
 
-				if next.total_pressure_added > max_total_pressure
-				{
-					max_total_pressure = next.total_pressure_added;
-					//dbg!(max_total_pressure);
-					//dbg!(&next);
-				}
+				decide_what_to_do(
+					next,
+					&cave,
+					&mut queue,
+					&mut max_total_pressure,
+				);
+			}
+		}
 
-				assert!(next.time_remaining >= 0);
-				if next.time_remaining == 0
-				{
-					//dbg!(&next);
-					continue;
-				}
+		for i in 0..cave.num_valves
+		{
+			if current.time_remaining_for_elephant == 0
+			{
+				break;
+			}
+			let distance = cave.distance[current.elephant_position as usize][i];
+			let time_needed = distance as i8 + 1;
+			if distance > 0
+				&& current.time_remaining_for_elephant >= time_needed
+				&& !current.has_been_opened(i as u8)
+			{
+				let mut next: State = current;
+				next.lumber(i as u8, cave);
+				next.break_open(cave);
 
-				next.perform_heuristics(cave);
-				if next.loose_upper_bound <= max_total_pressure
-				{
-					//dbg!(&next);
-					continue;
-				}
-
-				// If we are in the same position and have opened the same
-				// valves, the only thing that's changed is the order in which
-				// we opened them. So keep the one that is better.
-				if let Some(other) = queue.iter_mut().find(|other| {
-					other.position == next.position
-						&& other.is_open == next.is_open
-				})
-				{
-					if next.total_pressure_added > other.total_pressure_added
-					{
-						*other = next;
-					}
-					//dbg!(other);
-					continue;
-				}
-
-				//dbg!(&next);
-				queue.push(next);
+				decide_what_to_do(
+					next,
+					&cave,
+					&mut queue,
+					&mut max_total_pressure,
+				);
 			}
 		}
 
@@ -138,6 +150,57 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 		//);
 	}
 	max_total_pressure
+}
+
+fn decide_what_to_do(
+	mut next: State,
+	cave: &Cave,
+	queue: &mut Vec<State>,
+	max_total_pressure: &mut i32,
+)
+{
+	if next.total_pressure_added > *max_total_pressure
+	{
+		*max_total_pressure = next.total_pressure_added;
+		dbg!(*max_total_pressure);
+		//dbg!(&next);
+	}
+
+	assert!(next.time_remaining_for_traveler >= 0);
+	assert!(next.time_remaining_for_elephant >= 0);
+	if next.time_remaining_for_traveler == 0
+		&& next.time_remaining_for_elephant == 0
+	{
+		//dbg!(&next);
+		return;
+	}
+
+	next.perform_heuristics(cave);
+	if next.loose_upper_bound <= *max_total_pressure
+	{
+		//dbg!(&next);
+		return;
+	}
+
+	// If we are in the same position and have opened the same
+	// valves, the only thing that's changed is the order in which
+	// we opened them. So keep the one that is better.
+	if let Some(other) = queue.iter_mut().find(|other| {
+		other.is_open == next.is_open
+			&& other.traveler_position == next.traveler_position
+			&& other.elephant_position == next.elephant_position
+	})
+	{
+		if next.total_pressure_added > other.total_pressure_added
+		{
+			*other = next;
+		}
+		//dbg!(other);
+		return;
+	}
+
+	//dbg!(&next);
+	queue.push(next);
 }
 
 const READING_REGEX: &str = "Valve (?P<label>[A-Z][A-Z]) has flow \
@@ -261,8 +324,10 @@ fn sort_and_filter_valves(cave: &mut Cave)
 struct State
 {
 	is_open: u128,
-	time_remaining: i16,
-	position: u8,
+	time_remaining_for_traveler: i8,
+	time_remaining_for_elephant: i8,
+	traveler_position: u8,
+	elephant_position: u8,
 	total_pressure_added: i32,
 	greedy_lower_bound: i32,
 	loose_upper_bound: i32,
@@ -277,47 +342,82 @@ impl State
 
 	fn travel(&mut self, to: u8, cave: &Cave)
 	{
-		let from = self.position;
+		let from = self.traveler_position;
 		let distance = cave.distance[from as usize][to as usize];
-		self.time_remaining -= distance as i16;
-		self.position = to;
+		self.time_remaining_for_traveler -= distance as i8;
+		self.traveler_position = to;
+	}
+
+	fn lumber(&mut self, to: u8, cave: &Cave)
+	{
+		let from = self.elephant_position;
+		let distance = cave.distance[from as usize][to as usize];
+		self.time_remaining_for_elephant -= distance as i8;
+		self.elephant_position = to;
 	}
 
 	fn open(&mut self, cave: &Cave)
 	{
-		self.is_open |= 1u128 << (self.position as u128);
-		self.time_remaining -= 1;
-		let t = self.time_remaining as i32;
-		let flow = cave.flow_rate[self.position as usize];
+		self.is_open |= 1u128 << (self.traveler_position as u128);
+		self.time_remaining_for_traveler -= 1;
+		let t = self.time_remaining_for_traveler as i32;
+		let flow = cave.flow_rate[self.traveler_position as usize];
+		self.total_pressure_added += t * flow;
+	}
+
+	fn break_open(&mut self, cave: &Cave)
+	{
+		self.is_open |= 1u128 << (self.elephant_position as u128);
+		self.time_remaining_for_elephant -= 1;
+		let t = self.time_remaining_for_elephant as i32;
+		let flow = cave.flow_rate[self.elephant_position as usize];
 		self.total_pressure_added += t * flow;
 	}
 
 	fn perform_heuristics(&mut self, cave: &Cave)
 	{
-		let mut greedy_max = 0;
+		let mut greedy_traveler_max = 0;
+		let mut greedy_elephant_max = 0;
 		let mut loose_total: i32 = 0;
-		for possible_flow in (0..cave.num_valves)
-			.filter(|i| !self.has_been_opened(*i as u8))
-			.map(|i| {
-				let flow = cave.flow_rate[i];
-				let dis = cave.distance[self.position as usize][i] as i32;
-				(flow, dis)
-			})
-			.filter(|(_flow, dis)| *dis > 0)
-			.map(|(flow, dis)| {
-				let t = self.time_remaining as i32;
-				(flow, t - dis - 1)
-			})
-			.filter(|(_flow, t)| *t > 0)
-			.map(|(flow, t)| flow * t)
+		for i in 0..cave.num_valves
 		{
-			if possible_flow > greedy_max
+			if self.has_been_opened(i as u8)
 			{
-				greedy_max = possible_flow;
+				continue;
 			}
-			loose_total += possible_flow;
+			let flow = cave.flow_rate[i];
+			let dt = cave.distance[self.traveler_position as usize][i] as i32;
+			let de = cave.distance[self.elephant_position as usize][i] as i32;
+			assert!(dt > 0);
+			assert!(de > 0);
+			let tt = self.time_remaining_for_traveler as i32 - dt - 1;
+			let te = self.time_remaining_for_elephant as i32 - de - 1;
+			if tt > 0
+			{
+				let possible_flow = flow * tt;
+				if possible_flow > greedy_traveler_max
+				{
+					greedy_traveler_max = possible_flow;
+				}
+			}
+			if te > 0
+			{
+				let possible_flow = flow * te;
+				if possible_flow > greedy_elephant_max
+				{
+					greedy_elephant_max = possible_flow;
+				}
+			}
+			let t = std::cmp::max(tt, te);
+			if t > 0
+			{
+				let possible_flow = flow * t;
+				loose_total += possible_flow;
+			}
 		}
-		self.greedy_lower_bound = self.total_pressure_added + greedy_max;
+		self.greedy_lower_bound = self.total_pressure_added
+			+ greedy_traveler_max
+			+ greedy_elephant_max;
 		self.loose_upper_bound = self.total_pressure_added + loose_total;
 	}
 }
@@ -376,5 +476,35 @@ mod tests
 	fn one_testcase4()
 	{
 		assert_eq!(one(TESTCASE4), 2400);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 1707);
+	}
+
+	#[test]
+	fn two_testcase1()
+	{
+		assert_eq!(two(TESTCASE1), 2652);
+	}
+
+	#[test]
+	fn two_testcase2()
+	{
+		assert_eq!(two(TESTCASE2), 12355);
+	}
+
+	#[test]
+	fn two_testcase3()
+	{
+		assert_eq!(two(TESTCASE3), 1484);
+	}
+
+	#[test]
+	fn two_testcase4()
+	{
+		assert_eq!(two(TESTCASE4), 3680);
 	}
 }
