@@ -54,7 +54,6 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 		loose_upper_bound: 0,
 	};
 	initial_state.perform_heuristics(cave);
-	dbg!(&cave.distance[initial_state.position as usize][0..cave.num_valves]);
 	let mut queue: Vec<State> = Vec::new();
 	queue.push(initial_state);
 	let mut max_total_pressure = 0;
@@ -82,7 +81,7 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 				if next.total_pressure_added > max_total_pressure
 				{
 					max_total_pressure = next.total_pressure_added;
-					dbg!(max_total_pressure);
+					//dbg!(max_total_pressure);
 					//dbg!(&next);
 				}
 
@@ -175,12 +174,30 @@ fn parse_input(input: &str) -> Cave
 			{
 				cave.distance[i][j] = 1;
 				cave.distance[j][i] = 1;
-				for k in 0..i
+			}
+		}
+	}
+	for _ in 0..cave.num_valves
+	{
+		for i in 0..cave.num_valves
+		{
+			for j in 0..i
+			{
+				for k in 0..j
 				{
 					fix_distances(&mut cave, i, j, k);
-					fix_distances(&mut cave, j, i, k);
+					fix_distances(&mut cave, j, k, i);
+					fix_distances(&mut cave, k, i, j);
 				}
 			}
+		}
+	}
+	for i in 0..cave.num_valves
+	{
+		for j in 0..i
+		{
+			assert_eq!(cave.distance[i][j], cave.distance[j][i]);
+			assert!(cave.distance[i][j] > 0);
 		}
 	}
 	cave
@@ -188,19 +205,19 @@ fn parse_input(input: &str) -> Cave
 
 fn fix_distances(cave: &mut Cave, i: usize, j: usize, k: usize)
 {
-	if cave.distance[j][k] > 0 && i != k
+	assert_ne!(i, j);
+	assert_ne!(j, k);
+	assert_ne!(i, k);
+	if cave.distance[i][j] > 0 && cave.distance[j][k] > 0
 	{
-		assert_ne!(i, j);
-		assert_ne!(j, k);
-		assert_ne!(i, k);
+		let total = cave.distance[i][j] + cave.distance[j][k];
 		if cave.distance[i][k] == 0
 		{
-			cave.distance[i][k] = cave.distance[j][k] + 1;
+			cave.distance[i][k] = total;
 		}
 		else
 		{
-			cave.distance[i][k] =
-				std::cmp::min(cave.distance[i][k], cave.distance[j][k] + 1);
+			cave.distance[i][k] = std::cmp::min(cave.distance[i][k], total);
 		}
 		cave.distance[k][i] = cave.distance[i][k];
 	}
@@ -218,7 +235,26 @@ fn sort_and_filter_valves(cave: &mut Cave)
 	{
 		perm.apply_slice_in_place(&mut cave.distance[i]);
 	}
+
+	for i in 0..cave.num_valves
+	{
+		for j in 0..i
+		{
+			assert_eq!(cave.distance[i][j], cave.distance[j][i]);
+			assert!(cave.distance[i][j] > 0);
+		}
+	}
+
 	cave.num_valves = cave.flow_rate.iter().position(|i| *i == 0).unwrap();
+
+	let s = cave.starting_position();
+	for i in 0..cave.num_valves
+	{
+		if i != s
+		{
+			assert!(cave.distance[s][i] > 0);
+		}
+	}
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -295,6 +331,10 @@ mod tests
 	const PROVIDED: &str = include_str!("provided.txt");
 	const MINI: &str = include_str!("mini.txt");
 	const MINIGAP: &str = include_str!("minigap.txt");
+	const TESTCASE1: &str = include_str!("testcase1.txt");
+	const TESTCASE2: &str = include_str!("testcase2.txt");
+	const TESTCASE3: &str = include_str!("testcase3.txt");
+	const TESTCASE4: &str = include_str!("testcase4.txt");
 
 	#[test]
 	fn one_provided()
@@ -312,5 +352,29 @@ mod tests
 	fn one_minigap()
 	{
 		assert_eq!(one(MINIGAP), 543);
+	}
+
+	#[test]
+	fn one_testcase1()
+	{
+		assert_eq!(one(TESTCASE1), 2640);
+	}
+
+	#[test]
+	fn one_testcase2()
+	{
+		assert_eq!(one(TESTCASE2), 13468);
+	}
+
+	#[test]
+	fn one_testcase3()
+	{
+		assert_eq!(one(TESTCASE3), 1288);
+	}
+
+	#[test]
+	fn one_testcase4()
+	{
+		assert_eq!(one(TESTCASE4), 2400);
 	}
 }
