@@ -10,7 +10,8 @@ pub fn main()
 
 fn one(input: &str) -> i32
 {
-	let cave = parse_input(input);
+	let mut cave = parse_input(input);
+	sort_and_filter_valves(&mut cave);
 	calculate_max_total_pressure(&cave)
 }
 
@@ -19,7 +20,7 @@ fn two(_input: &str) -> i32
 	0
 }
 
-const MAX_TIME: usize = 30;
+const MAX_TIME: i32 = 30;
 const MAX_VALVES: usize = 128;
 
 #[derive(Debug)]
@@ -28,82 +29,67 @@ struct Cave
 	num_valves: usize,
 	valve_labels: [[u8; 2]; MAX_VALVES],
 	flow_rate: [i32; MAX_VALVES],
-	is_connected: [u128; MAX_VALVES],
+	distance: [[u8; MAX_VALVES]; MAX_VALVES],
 }
 
 impl Cave
 {
 	fn starting_position(&self) -> usize
 	{
-		self.valve_labels[0..self.num_valves]
+		self.valve_labels
 			.iter()
 			.position(|label| label == &[b'A', b'A'])
 			.unwrap()
-	}
-
-	fn are_connected(&self, from: u8, to: u8) -> bool
-	{
-		(self.is_connected[from as usize] & (1 << to)) != 0
 	}
 }
 
 fn calculate_max_total_pressure(cave: &Cave) -> i32
 {
-	let initial_state = State {
+	let mut initial_state = State {
 		is_open: 0,
+		time_remaining: MAX_TIME,
 		position: cave.starting_position() as u8,
-		suggestion: 0,
-		flow: 0,
-		total_pressure: 0,
+		total_pressure_added: 0,
+		heuristic: 0,
 	};
-	let mut stack = [State::default(); MAX_TIME + 1];
-	stack[0] = initial_state;
-	let mut t = 0;
+	initial_state.perform_heuristic(cave);
+	let mut queue: Vec<State> = Vec::new();
+	queue.push(initial_state);
 	let mut max_total_pressure = 0;
-	loop
+	while let Some(i_of_max) = queue
+		.iter()
+		.enumerate()
+		.max_by_key(|(_i, state)| state.heuristic)
+		.map(|(i, _)| i)
 	{
-		while (stack[t].suggestion as usize) >= cave.num_valves
+		let current = queue.swap_remove(i_of_max);
+		if current.total_pressure_added > max_total_pressure
 		{
-			if t == 0
-			{
-				return max_total_pressure;
-			}
-			t -= 1;
-			stack[t].suggestion += 1;
+			max_total_pressure = current.total_pressure_added;
+			// The heuristic is a loose upper bound on total pressure.
+			queue.retain(|state| state.heuristic >= max_total_pressure);
 		}
 
-		let current = &mut stack[t];
-		//println!("t = {t}, current = {current:?}");
+		if current.time_remaining <= 0
+		{
+			continue;
+		}
 
-		if t == MAX_TIME
+		for i in 0..cave.num_valves
 		{
-			let total_pressure = current.total_pressure;
-			if total_pressure > max_total_pressure
+			let distance = cave.distance[current.position as usize][i];
+			let time_needed = distance as i32 + 1;
+			if current.time_remaining >= time_needed
+				&& !current.has_been_opened(i as u8)
 			{
-				max_total_pressure = total_pressure;
+				let mut next: State = current;
+				next.travel(i as u8, cave);
+				next.open(cave);
+				queue.push(next);
 			}
-			current.suggestion = 0xFF;
-		}
-		else if current.suggestion == current.position
-			&& !current.has_been_opened(current.position)
-		{
-			let valve = current.position;
-			stack[t + 1] = current.advance();
-			stack[t + 1].open(valve, cave);
-			t += 1;
-		}
-		else if cave.are_connected(current.position, current.suggestion)
-		{
-			let destination = current.suggestion;
-			stack[t + 1] = current.advance();
-			stack[t + 1].position = destination;
-			t += 1;
-		}
-		else
-		{
-			current.suggestion += 1;
 		}
 	}
+	max_total_pressure
 }
 
 const READING_REGEX: &str = "Valve (?P<label>[A-Z][A-Z]) has flow \
@@ -117,7 +103,7 @@ fn parse_input(input: &str) -> Cave
 		num_valves: 0,
 		valve_labels: [[0; 2]; MAX_VALVES],
 		flow_rate: [0; MAX_VALVES],
-		is_connected: [0; MAX_VALVES],
+		distance: [[0; MAX_VALVES]; MAX_VALVES],
 	};
 	for line in input.lines()
 	{
@@ -133,12 +119,36 @@ fn parse_input(input: &str) -> Cave
 		let exits = exits_str.split(", ");
 		for exit in exits
 		{
-			for j in 0..i
+			let earlier_valve = cave.valve_labels[0..i]
+				.iter()
+				.position(|label| label == exit.as_bytes());
+			if let Some(j) = earlier_valve
 			{
-				if &cave.valve_labels[j] == exit.as_bytes()
+				cave.distance[i][j] = 1;
+				cave.distance[j][i] = 1;
+			}
+		}
+		for j in 0..i
+		{
+			if cave.distance[i][j] == 1
+			{
+				for k in 0..i
 				{
-					cave.is_connected[i] |= 1 << j;
-					cave.is_connected[j] |= 1 << i;
+					if cave.distance[j][k] > 0
+					{
+						if cave.distance[i][k] == 0
+						{
+							cave.distance[i][k] = cave.distance[j][k] + 1;
+						}
+						else if cave.distance[i][k] > 1
+						{
+							cave.distance[i][k] = std::cmp::max(
+								cave.distance[i][k],
+								cave.distance[j][k] + 1,
+							);
+						}
+						cave.distance[k][i] = cave.distance[i][k];
+					}
 				}
 			}
 		}
@@ -146,14 +156,29 @@ fn parse_input(input: &str) -> Cave
 	cave
 }
 
+fn sort_and_filter_valves(cave: &mut Cave)
+{
+	// Sort the valves from high flow rate to low, in particular such that
+	// the valves with positive flow rate are all at the start.
+	let mut perm = permutation::sort_by_key(&cave.flow_rate, |i| -(*i as i32));
+	perm.apply_slice_in_place(&mut cave.valve_labels);
+	perm.apply_slice_in_place(&mut cave.flow_rate);
+	perm.apply_slice_in_place(&mut cave.distance);
+	for i in 0..cave.num_valves
+	{
+		perm.apply_slice_in_place(&mut cave.distance[i]);
+	}
+	cave.num_valves = cave.flow_rate.iter().position(|i| *i == 0).unwrap();
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 struct State
 {
 	is_open: u128,
+	time_remaining: i32,
 	position: u8,
-	suggestion: u8,
-	flow: i32,
-	total_pressure: i32,
+	total_pressure_added: i32,
+	heuristic: i32,
 }
 
 impl State
@@ -163,22 +188,31 @@ impl State
 		(self.is_open & (1 << pos)) != 0
 	}
 
-	fn open(&mut self, pos: u8, cave: &Cave)
+	fn travel(&mut self, to: u8, cave: &Cave)
 	{
-		self.is_open |= 1 << pos;
-		self.flow += cave.flow_rate[self.position as usize];
+		let from = self.position;
+		let distance = cave.distance[from as usize][to as usize];
+		self.time_remaining -= distance as i32;
+		self.position = to;
 	}
 
-	fn advance(&self) -> State
+	fn open(&mut self, cave: &Cave)
 	{
-		let total_pressure = self.total_pressure + self.flow;
-		State {
-			is_open: self.is_open,
-			position: self.position,
-			suggestion: 0,
-			flow: self.flow,
-			total_pressure,
-		}
+		self.is_open |= 1 << self.position;
+		self.time_remaining -= 1;
+		let t = self.time_remaining as i32;
+		let flow = cave.flow_rate[self.position as usize];
+		self.total_pressure_added += t * flow;
+	}
+
+	fn perform_heuristic(&mut self, cave: &Cave)
+	{
+		let flow_available: i32 = (0..cave.num_valves)
+			.filter(|i| !self.has_been_opened(*i as u8))
+			.map(|i| cave.flow_rate[i])
+			.sum();
+		let t = self.time_remaining as i32;
+		self.heuristic = self.total_pressure_added + t * flow_available;
 	}
 }
 

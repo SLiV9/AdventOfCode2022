@@ -8,6 +8,7 @@ pretty_assertions = "0.6"
 parse-display = "0.6"
 itertools = "0.10"
 regex = "1.7"
+permutation = "0.4"
 
 [dev-dependencies]
 
