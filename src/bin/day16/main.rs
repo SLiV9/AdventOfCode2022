@@ -177,26 +177,30 @@ fn parse_input(input: &str) -> Cave
 			{
 				for k in 0..i
 				{
-					if cave.distance[j][k] > 0
-					{
-						if cave.distance[i][k] == 0
-						{
-							cave.distance[i][k] = cave.distance[j][k] + 1;
-						}
-						else if cave.distance[i][k] > 1
-						{
-							cave.distance[i][k] = std::cmp::max(
-								cave.distance[i][k],
-								cave.distance[j][k] + 1,
-							);
-						}
-						cave.distance[k][i] = cave.distance[i][k];
-					}
+					fix_distances(&mut cave, i, j, k);
+					fix_distances(&mut cave, j, i, k);
 				}
 			}
 		}
 	}
 	cave
+}
+
+fn fix_distances(cave: &mut Cave, i: usize, j: usize, k: usize)
+{
+	if cave.distance[j][k] > 0
+	{
+		if cave.distance[i][k] == 0
+		{
+			cave.distance[i][k] = cave.distance[j][k] + 1;
+		}
+		else if cave.distance[i][k] > 1
+		{
+			cave.distance[i][k] =
+				std::cmp::max(cave.distance[i][k], cave.distance[j][k] + 1);
+		}
+		cave.distance[k][i] = cave.distance[i][k];
+	}
 }
 
 fn sort_and_filter_valves(cave: &mut Cave)
@@ -229,7 +233,7 @@ impl State
 {
 	fn has_been_opened(&self, pos: u8) -> bool
 	{
-		(self.is_open & (1 << pos)) != 0
+		(self.is_open & (1u128 << (pos as u128))) != 0
 	}
 
 	fn travel(&mut self, to: u8, cave: &Cave)
@@ -242,7 +246,7 @@ impl State
 
 	fn open(&mut self, cave: &Cave)
 	{
-		self.is_open |= 1 << self.position;
+		self.is_open |= 1u128 << (self.position as u128);
 		self.time_remaining -= 1;
 		let t = self.time_remaining as i32;
 		let flow = cave.flow_rate[self.position as usize];
@@ -282,6 +286,7 @@ mod tests
 
 	const PROVIDED: &str = include_str!("provided.txt");
 	const MINI: &str = include_str!("mini.txt");
+	const MINIGAP: &str = include_str!("minigap.txt");
 
 	#[test]
 	fn one_provided()
@@ -293,5 +298,11 @@ mod tests
 	fn one_mini()
 	{
 		assert_eq!(one(MINI), 931);
+	}
+
+	#[test]
+	fn one_minigap()
+	{
+		assert_eq!(one(MINIGAP), 910);
 	}
 }
