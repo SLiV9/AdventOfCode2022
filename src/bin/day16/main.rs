@@ -70,7 +70,8 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 		{
 			let distance = cave.distance[current.position as usize][i];
 			let time_needed = distance as i16 + 1;
-			if current.time_remaining >= time_needed
+			if distance > 0
+				&& current.time_remaining >= time_needed
 				&& !current.has_been_opened(i as u8)
 			{
 				let mut next: State = current;
