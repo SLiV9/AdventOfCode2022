@@ -20,7 +20,7 @@ fn two(_input: &str) -> i32
 	0
 }
 
-const MAX_TIME: i32 = 30;
+const MAX_TIME: i16 = 30;
 const MAX_VALVES: usize = 128;
 
 #[derive(Debug)]
@@ -50,44 +50,86 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 		time_remaining: MAX_TIME,
 		position: cave.starting_position() as u8,
 		total_pressure_added: 0,
-		heuristic: 0,
+		greedy_lower_bound: 0,
+		loose_upper_bound: 0,
 	};
-	initial_state.perform_heuristic(cave);
+	initial_state.perform_heuristics(cave);
 	let mut queue: Vec<State> = Vec::new();
 	queue.push(initial_state);
 	let mut max_total_pressure = 0;
 	while let Some(i_of_max) = queue
 		.iter()
 		.enumerate()
-		.max_by_key(|(_i, state)| state.heuristic)
+		.max_by_key(|(_i, state)| state.greedy_lower_bound)
 		.map(|(i, _)| i)
 	{
 		let current = queue.swap_remove(i_of_max);
-		if current.total_pressure_added > max_total_pressure
-		{
-			max_total_pressure = current.total_pressure_added;
-			// The heuristic is a loose upper bound on total pressure.
-			queue.retain(|state| state.heuristic >= max_total_pressure);
-		}
-
-		if current.time_remaining <= 0
-		{
-			continue;
-		}
+		//println!("current = {current:?}");
 
 		for i in 0..cave.num_valves
 		{
 			let distance = cave.distance[current.position as usize][i];
-			let time_needed = distance as i32 + 1;
+			let time_needed = distance as i16 + 1;
 			if current.time_remaining >= time_needed
 				&& !current.has_been_opened(i as u8)
 			{
 				let mut next: State = current;
 				next.travel(i as u8, cave);
 				next.open(cave);
+
+				if next.total_pressure_added > max_total_pressure
+				{
+					max_total_pressure = next.total_pressure_added;
+					dbg!(max_total_pressure);
+				}
+
+				assert!(next.time_remaining >= 0);
+				if next.time_remaining == 0
+				{
+					continue;
+				}
+
+				next.perform_heuristics(cave);
+				if next.loose_upper_bound <= max_total_pressure
+				{
+					continue;
+				}
+
+				// If we are in the same position and have opened the same
+				// valves, the only thing that's changed is the order in which
+				// we opened them. So keep the one that is better.
+				if let Some(other) = queue.iter_mut().find(|other| {
+					other.position == next.position
+						&& other.is_open == next.is_open
+				})
+				{
+					if next.total_pressure_added > other.total_pressure_added
+					{
+						*other = next;
+					}
+					continue;
+				}
+
 				queue.push(next);
 			}
 		}
+
+		queue.retain(|state| state.loose_upper_bound > max_total_pressure);
+		//println!(
+		//	"len = {}, min = {}, max = {}, best = {}",
+		//	queue.len(),
+		//	queue
+		//		.iter()
+		//		.map(|state| state.loose_upper_bound)
+		//		.min()
+		//		.unwrap_or(0),
+		//	queue
+		//		.iter()
+		//		.map(|state| state.loose_upper_bound)
+		//		.max()
+		//		.unwrap_or(0),
+		//	max_total_pressure
+		//);
 	}
 	max_total_pressure
 }
@@ -175,10 +217,11 @@ fn sort_and_filter_valves(cave: &mut Cave)
 struct State
 {
 	is_open: u128,
-	time_remaining: i32,
+	time_remaining: i16,
 	position: u8,
 	total_pressure_added: i32,
-	heuristic: i32,
+	greedy_lower_bound: i32,
+	loose_upper_bound: i32,
 }
 
 impl State
@@ -192,7 +235,7 @@ impl State
 	{
 		let from = self.position;
 		let distance = cave.distance[from as usize][to as usize];
-		self.time_remaining -= distance as i32;
+		self.time_remaining -= distance as i16;
 		self.position = to;
 	}
 
@@ -205,14 +248,28 @@ impl State
 		self.total_pressure_added += t * flow;
 	}
 
-	fn perform_heuristic(&mut self, cave: &Cave)
+	fn perform_heuristics(&mut self, cave: &Cave)
 	{
-		let flow_available: i32 = (0..cave.num_valves)
+		let mut greedy_max = 0;
+		let mut loose_total: i32 = 0;
+		for possible_flow in (0..cave.num_valves)
 			.filter(|i| !self.has_been_opened(*i as u8))
-			.map(|i| cave.flow_rate[i])
-			.sum();
-		let t = self.time_remaining as i32;
-		self.heuristic = self.total_pressure_added + t * flow_available;
+			.map(|i| {
+				let t = self.time_remaining as i32;
+				let dis = cave.distance[self.position as usize][i] as i32;
+				(cave.flow_rate[i], t - dis - 1)
+			})
+			.filter(|(_flow, t)| *t > 0)
+			.map(|(flow, t)| flow * t)
+		{
+			if possible_flow > greedy_max
+			{
+				greedy_max = possible_flow;
+			}
+			loose_total += possible_flow;
+		}
+		self.greedy_lower_bound = self.total_pressure_added + greedy_max;
+		self.loose_upper_bound = self.total_pressure_added + loose_total;
 	}
 }
 
