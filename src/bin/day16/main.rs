@@ -54,6 +54,7 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 		loose_upper_bound: 0,
 	};
 	initial_state.perform_heuristics(cave);
+	dbg!(&cave.distance[initial_state.position as usize][0..cave.num_valves]);
 	let mut queue: Vec<State> = Vec::new();
 	queue.push(initial_state);
 	let mut max_total_pressure = 0;
@@ -82,17 +83,20 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 				{
 					max_total_pressure = next.total_pressure_added;
 					dbg!(max_total_pressure);
+					//dbg!(&next);
 				}
 
 				assert!(next.time_remaining >= 0);
 				if next.time_remaining == 0
 				{
+					//dbg!(&next);
 					continue;
 				}
 
 				next.perform_heuristics(cave);
 				if next.loose_upper_bound <= max_total_pressure
 				{
+					//dbg!(&next);
 					continue;
 				}
 
@@ -108,9 +112,11 @@ fn calculate_max_total_pressure(cave: &Cave) -> i32
 					{
 						*other = next;
 					}
+					//dbg!(other);
 					continue;
 				}
 
+				//dbg!(&next);
 				queue.push(next);
 			}
 		}
@@ -169,12 +175,6 @@ fn parse_input(input: &str) -> Cave
 			{
 				cave.distance[i][j] = 1;
 				cave.distance[j][i] = 1;
-			}
-		}
-		for j in 0..i
-		{
-			if cave.distance[i][j] == 1
-			{
 				for k in 0..i
 				{
 					fix_distances(&mut cave, i, j, k);
@@ -188,16 +188,19 @@ fn parse_input(input: &str) -> Cave
 
 fn fix_distances(cave: &mut Cave, i: usize, j: usize, k: usize)
 {
-	if cave.distance[j][k] > 0
+	if cave.distance[j][k] > 0 && i != k
 	{
+		assert_ne!(i, j);
+		assert_ne!(j, k);
+		assert_ne!(i, k);
 		if cave.distance[i][k] == 0
 		{
 			cave.distance[i][k] = cave.distance[j][k] + 1;
 		}
-		else if cave.distance[i][k] > 1
+		else
 		{
 			cave.distance[i][k] =
-				std::cmp::max(cave.distance[i][k], cave.distance[j][k] + 1);
+				std::cmp::min(cave.distance[i][k], cave.distance[j][k] + 1);
 		}
 		cave.distance[k][i] = cave.distance[i][k];
 	}
@@ -260,9 +263,14 @@ impl State
 		for possible_flow in (0..cave.num_valves)
 			.filter(|i| !self.has_been_opened(*i as u8))
 			.map(|i| {
-				let t = self.time_remaining as i32;
+				let flow = cave.flow_rate[i];
 				let dis = cave.distance[self.position as usize][i] as i32;
-				(cave.flow_rate[i], t - dis - 1)
+				(flow, dis)
+			})
+			.filter(|(_flow, dis)| *dis > 0)
+			.map(|(flow, dis)| {
+				let t = self.time_remaining as i32;
+				(flow, t - dis - 1)
 			})
 			.filter(|(_flow, t)| *t > 0)
 			.map(|(flow, t)| flow * t)
@@ -303,6 +311,6 @@ mod tests
 	#[test]
 	fn one_minigap()
 	{
-		assert_eq!(one(MINIGAP), 910);
+		assert_eq!(one(MINIGAP), 543);
 	}
 }
