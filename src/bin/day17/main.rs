@@ -64,7 +64,6 @@ struct Cave
 	height_from_cutoff: usize,
 	y_of_cutoff: usize,
 	grid: [u8; MAX_HEIGHT],
-	water: [u8; MAX_HEIGHT],
 }
 
 impl Default for Cave
@@ -76,7 +75,6 @@ impl Default for Cave
 			height_from_cutoff: 0,
 			y_of_cutoff: 0,
 			grid: [0; MAX_HEIGHT],
-			water: [0; MAX_HEIGHT],
 		}
 	}
 }
@@ -106,12 +104,43 @@ impl Cave
 		}
 	}
 
+	fn find_cutoff(&self) -> usize
+	{
+		let cave_mask = ((1 << CAVE_WIDTH) - 1) as u8;
+		let mut water_mask = cave_mask;
+		for y in (1..self.height_from_cutoff).rev()
+		{
+			let gap_mask = !self.grid[y];
+			water_mask = water_mask & gap_mask;
+
+			for _i in 0..CAVE_WIDTH
+			{
+				let left_mask = (water_mask >> 1) & cave_mask & gap_mask;
+				let right_mask = (water_mask << 1) & cave_mask & gap_mask;
+				let merged_mask = water_mask | left_mask | right_mask;
+				if merged_mask == water_mask
+				{
+					break;
+				}
+				water_mask = merged_mask;
+			}
+
+			if water_mask == 0
+			{
+				return y;
+			}
+		}
+		0
+	}
+
 	fn perform_cutoff(&mut self)
 	{
-		// TODO perform floodfill from the top
-		// TODO determine the lowest y reached by the floodfill
-		// TODO cutoff at that y
-		unimplemented!()
+		let y = self.find_cutoff();
+		assert!(y <= self.height_from_cutoff);
+		self.grid.copy_within(y.., 0);
+		self.height_from_cutoff -= y;
+		self.y_of_cutoff += y;
+		self.grid[self.height_from_cutoff..].fill(0);
 	}
 }
 
@@ -121,7 +150,7 @@ fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 	let wind_data_len = wind_data.len();
 	let mut wind_offset = 0;
 	let mut shape_offset = 0;
-	for _k in 0..number_of_rocks
+	for k in 0..number_of_rocks
 	{
 		let shape = SHAPE_DATA[shape_offset];
 		let shape_width = SHAPE_WIDTH[shape_offset];
@@ -131,6 +160,7 @@ fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 		if y + SHAPE_HEIGHT >= MAX_HEIGHT
 		{
 			cave.perform_cutoff();
+			y = cave.height_from_cutoff + 3;
 		}
 		assert!(y + SHAPE_HEIGHT < MAX_HEIGHT);
 
@@ -178,6 +208,15 @@ fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 		cave.place(shape, x, y);
 
 		shape_offset = (shape_offset + 1) % NUM_SHAPES;
+
+		let m = 1000000;
+		if number_of_rocks > m
+		{
+			if k % m == 0
+			{
+				println!("{}M / {}M", k / m, number_of_rocks / m);
+			}
+		}
 	}
 }
 
