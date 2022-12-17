@@ -12,13 +12,14 @@ fn one(input: &str) -> usize
 {
 	let mut cave = Cave::default();
 	run_simulation(&mut cave, input, 2022);
-	print_cave(&cave.grid[0..10]);
-	cave.height
+	cave.height_from_floor
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> usize
 {
-	0
+	let mut cave = Cave::default();
+	run_simulation(&mut cave, input, 1000000000000);
+	cave.height_from_floor
 }
 
 const NUM_SHAPES: usize = 5;
@@ -55,12 +56,15 @@ const SHAPE_DATA: [[u8; SHAPE_HEIGHT]; NUM_SHAPES] = [
 ];
 
 const CAVE_WIDTH: usize = 7;
-const MAX_HEIGHT: usize = 16000;
+const MAX_HEIGHT: usize = 8000;
 
 struct Cave
 {
-	height: usize,
+	height_from_floor: usize,
+	height_from_cutoff: usize,
+	y_of_cutoff: usize,
 	grid: [u8; MAX_HEIGHT],
+	water: [u8; MAX_HEIGHT],
 }
 
 impl Default for Cave
@@ -68,8 +72,11 @@ impl Default for Cave
 	fn default() -> Cave
 	{
 		Cave {
-			height: 0,
+			height_from_floor: 0,
+			height_from_cutoff: 0,
+			y_of_cutoff: 0,
 			grid: [0; MAX_HEIGHT],
+			water: [0; MAX_HEIGHT],
 		}
 	}
 }
@@ -90,12 +97,21 @@ impl Cave
 			{
 				self.grid[y + i] |= slice;
 				let h = y + i + 1;
-				if h > self.height
+				if h > self.height_from_cutoff
 				{
-					self.height = h;
+					self.height_from_cutoff = h;
+					self.height_from_floor = self.y_of_cutoff + h;
 				}
 			}
 		}
+	}
+
+	fn perform_cutoff(&mut self)
+	{
+		// TODO perform floodfill from the top
+		// TODO determine the lowest y reached by the floodfill
+		// TODO cutoff at that y
+		unimplemented!()
 	}
 }
 
@@ -110,7 +126,13 @@ fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 		let shape = SHAPE_DATA[shape_offset];
 		let shape_width = SHAPE_WIDTH[shape_offset];
 		let mut x = 2;
-		let mut y = cave.height + 3;
+		let mut y = cave.height_from_cutoff + 3;
+
+		if y + SHAPE_HEIGHT >= MAX_HEIGHT
+		{
+			cave.perform_cutoff();
+		}
+		assert!(y + SHAPE_HEIGHT < MAX_HEIGHT);
 
 		loop
 		{
@@ -196,8 +218,14 @@ mod tests
 	}
 
 	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 1514285714288);
+	}
+
+	#[test]
 	fn one_without_wind()
 	{
-		assert_eq!(one("="), 4447);
+		assert_eq!(one("="), 4448);
 	}
 }
