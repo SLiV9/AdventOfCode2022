@@ -1,5 +1,7 @@
 /**/
 
+use std::collections::HashMap;
+
 const INPUT: &str = include_str!("input.txt");
 
 pub fn main()
@@ -56,7 +58,7 @@ const SHAPE_DATA: [[u8; SHAPE_HEIGHT]; NUM_SHAPES] = [
 ];
 
 const CAVE_WIDTH: usize = 7;
-const MAX_HEIGHT: usize = 8000;
+const MAX_HEIGHT: usize = 128;
 
 struct Cave
 {
@@ -144,11 +146,35 @@ impl Cave
 	}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct LoopState
+{
+	wind_offset: usize,
+	grid: [u8; MAX_HEIGHT],
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Stage
+{
+	num_placed: usize,
+	height: usize,
+}
+
 fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 {
 	let wind_data = input.as_bytes();
+	run_sim_1(cave, wind_data, 0, number_of_rocks)
+}
+
+fn run_sim_1(
+	cave: &mut Cave,
+	wind_data: &[u8],
+	mut wind_offset: usize,
+	number_of_rocks: usize,
+)
+{
 	let wind_data_len = wind_data.len();
-	let mut wind_offset = 0;
+	let mut cache: HashMap<LoopState, Stage> = HashMap::new();
 	let mut shape_offset = 0;
 	for k in 0..number_of_rocks
 	{
@@ -209,12 +235,40 @@ fn run_simulation(cave: &mut Cave, input: &str, number_of_rocks: usize)
 
 		shape_offset = (shape_offset + 1) % NUM_SHAPES;
 
-		let m = 1000000;
-		if number_of_rocks > m
+		let num_placed = k + 1;
+		let m = 10 * wind_data_len * NUM_SHAPES;
+		if number_of_rocks > m && (num_placed % m) == 0
 		{
-			if k % m == 0
+			println!("{} / {} loops", num_placed / m, number_of_rocks / m);
+
+			assert!(shape_offset == 0);
+			let current_loop_state = LoopState {
+				wind_offset,
+				grid: cave.grid.clone(),
+			};
+			let current = Stage {
+				num_placed,
+				height: cave.height_from_floor,
+			};
+			dbg!(current);
+			if let Some(previous) = cache.get(&current_loop_state)
 			{
-				println!("{}M / {}M", k / m, number_of_rocks / m);
+				dbg!(previous);
+				let rock_difference = current.num_placed - previous.num_placed;
+				let height_difference = current.height - previous.height;
+				let num_remaining = number_of_rocks - current.num_placed;
+				let num_skips = num_remaining / rock_difference;
+				let num_remaining = num_remaining % rock_difference;
+				dbg!(num_skips);
+				dbg!(num_remaining);
+				cave.height_from_floor += num_skips * height_difference;
+				cave.y_of_cutoff += num_skips * height_difference;
+				dbg!(cave.height_from_floor);
+				return run_sim_1(cave, wind_data, wind_offset, num_remaining);
+			}
+			else
+			{
+				cache.insert(current_loop_state, current);
 			}
 		}
 	}
@@ -260,11 +314,5 @@ mod tests
 	fn two_provided()
 	{
 		assert_eq!(two(PROVIDED), 1514285714288);
-	}
-
-	#[test]
-	fn one_without_wind()
-	{
-		assert_eq!(one("="), 4448);
 	}
 }

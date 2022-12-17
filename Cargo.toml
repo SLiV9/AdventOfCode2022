@@ -14,3 +14,5 @@ permutation = "0.4"
 
 [lib]
 
+[profile.release]
+debug = true
