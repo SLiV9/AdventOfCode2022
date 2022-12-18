@@ -117,7 +117,7 @@ impl Sides
 				let line = self.x_planes[x as usize][y as usize];
 				for z in 0..=self.max_z
 				{
-					if (line & (1u128 << z)) == 0
+					if x > 0 || (line & (1u128 << z)) == 0
 					{
 						steam.push(Pixel { x, y, z });
 					}
@@ -131,7 +131,7 @@ impl Sides
 				let line = self.y_planes[y as usize][z as usize];
 				for x in 0..=self.max_x
 				{
-					if (line & (1u128 << x)) == 0
+					if y > 0 || (line & (1u128 << x)) == 0
 					{
 						steam.push(Pixel { x, y, z });
 					}
@@ -145,7 +145,7 @@ impl Sides
 				let line = self.z_planes[z as usize][x as usize];
 				for y in 0..=self.max_y
 				{
-					if (line & (1u128 << y)) == 0
+					if z > 0 || (line & (1u128 << y)) == 0
 					{
 						steam.push(Pixel { x, y, z });
 					}
@@ -161,6 +161,9 @@ impl Sides
 			expand(self, &mut steam, from);
 		}
 		// Erase all the sides that touch steam.
+		self.x_planes[0].fill(0);
+		self.y_planes[0].fill(0);
+		self.z_planes[0].fill(0);
 		for x in 0..=(self.max_x + 1)
 		{
 			for y in 0..=(self.max_y + 1)
@@ -273,6 +276,7 @@ mod tests
 	const CUBE_2X2X2: &str = include_str!("cube_2x2x2.txt");
 	const CUBE_3X3X3: &str = include_str!("cube_3x3x3.txt");
 	const CUBE_WITH_HOLE: &str = include_str!("cube_with_hole.txt");
+	const CATBERT: &str = include_str!("catbert.txt");
 
 	#[test]
 	fn one_provided()
@@ -284,6 +288,18 @@ mod tests
 	fn two_provided()
 	{
 		assert_eq!(two(PROVIDED), 58);
+	}
+
+	#[test]
+	fn one_cube_pixel()
+	{
+		assert_eq!(one("0,0,0"), 6);
+	}
+
+	#[test]
+	fn two_cube_pixel()
+	{
+		assert_eq!(two("0,0,0"), 6);
 	}
 
 	#[test]
@@ -332,5 +348,17 @@ mod tests
 	fn two_cube_with_hole()
 	{
 		assert_eq!(two(CUBE_WITH_HOLE), 54);
+	}
+
+	#[test]
+	fn one_catbert()
+	{
+		assert_eq!(one(CATBERT), 108);
+	}
+
+	#[test]
+	fn two_catbert()
+	{
+		assert_eq!(two(CATBERT), 90);
 	}
 }
