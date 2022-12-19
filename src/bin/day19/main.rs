@@ -1,5 +1,7 @@
 /**/
 
+use smallvec::SmallVec;
+
 const INPUT: &str = include_str!("input.txt");
 
 pub fn main()
@@ -46,129 +48,258 @@ fn determine_quality_level(blueprint: Blueprint) -> i32
 
 fn optimize_num_geodes(blueprint: Blueprint) -> i32
 {
-	let strategies = (1..MAX_TIME)
-		.flat_map(|o| (1..(MAX_TIME - o)).map(move |c| (o, c)))
-		.flat_map(|(o, c)| (0..(MAX_TIME - o - c)).map(move |x| (o, c, x)))
-		.map(|(o, c, x)| Strategy {
-			max_additional_ore_robots: x,
-			max_clay_robots: c,
-			max_obsidian_robots: o,
-		});
+	let mut starting_state = State::default();
+	starting_state.world.num_ore_robots = 1;
+	starting_state.time_remaining = MAX_TIME;
 	let mut max_num_geodes = 0;
-	for strategy in strategies
+	let mut stack = Vec::new();
+	stack.push(starting_state);
+	while let Some(state) = stack.pop()
 	{
-		dbg!(strategy);
-		let outcome = run_simulation(blueprint, strategy);
-		dbg!(outcome);
-		if outcome.num_geodes > max_num_geodes
+		//dbg!(&state);
+		let num_geodes =
+			run_simulation(blueprint, state, &mut stack, Some(max_num_geodes));
+		if num_geodes > max_num_geodes
 		{
-			max_num_geodes = outcome.num_geodes;
+			max_num_geodes = num_geodes;
 		}
 	}
 	max_num_geodes
 }
 
 const MAX_TIME: i32 = 24;
+const MAX_STRATEGY_LEN: usize = MAX_TIME as usize;
 
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Strategy
 {
-	max_additional_ore_robots: i32,
-	max_clay_robots: i32,
-	max_obsidian_robots: i32,
+	choices: SmallVec<[ResourceType; MAX_STRATEGY_LEN]>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-struct Outcome
+impl std::hash::Hash for Strategy
 {
-	num_geodes: i32,
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H)
+	{
+		self.choices[..].hash(state)
+	}
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Strategy
+{
+	#[cfg(test)]
+	fn parse(input: &str) -> Strategy
+	{
+		let choices = input
+			.chars()
+			.map(|x| x.to_string().parse().unwrap())
+			.collect();
+		Strategy { choices }
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(parse_display::Display, parse_display::FromStr)]
+#[repr(u8)]
 enum ResourceType
 {
+	#[display("x")]
 	Ore,
+	#[display("c")]
 	Clay,
+	#[display("o")]
 	Obsidian,
+	#[display("g")]
 	Geode,
 }
 
-fn run_simulation(blueprint: Blueprint, strategy: Strategy) -> Outcome
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+struct World
 {
-	let mut num_ore_robots = 1;
-	let mut num_clay_robots = 0;
-	let mut num_obsidian_robots = 0;
-	let mut num_geode_robots = 0;
-	let mut ore = 0;
-	let mut clay = 0;
-	let mut obsidian = 0;
-	let mut geodes = 0;
-	let Strategy {
-		max_additional_ore_robots,
-		max_clay_robots,
-		max_obsidian_robots,
-	} = strategy;
-	let mut additional_ore_robots = max_additional_ore_robots;
-	let mut additional_clay_robots = max_clay_robots;
-	let mut additional_obsidian_robots = max_obsidian_robots;
-	for _time_remaining in (0..MAX_TIME).rev()
+	num_ore_robots: i32,
+	num_clay_robots: i32,
+	num_obsidian_robots: i32,
+	num_geode_robots: i32,
+	ore: i32,
+	clay: i32,
+	obsidian: i32,
+	geodes: i32,
+}
+
+impl World
+{
+	fn can_afford(&self, robot_type: ResourceType, blueprint: Blueprint)
+		-> bool
 	{
-		// Choose what mining robot to buy.
-		let miner_type = if ore >= blueprint.geode_robot_ore_cost
-			&& obsidian >= blueprint.geode_robot_obsidian_cost
+		match robot_type
 		{
-			ore -= blueprint.geode_robot_ore_cost;
-			obsidian -= blueprint.geode_robot_obsidian_cost;
-			Some(ResourceType::Geode)
-		}
-		else if additional_obsidian_robots > 0
-			&& ore >= blueprint.obsidian_robot_ore_cost
-			&& clay >= blueprint.obsidian_robot_clay_cost
-		{
-			additional_obsidian_robots -= 1;
-			ore -= blueprint.obsidian_robot_ore_cost;
-			clay -= blueprint.obsidian_robot_clay_cost;
-			Some(ResourceType::Obsidian)
-		}
-		else if additional_clay_robots > 0
-			&& ore >= blueprint.clay_robot_ore_cost
-		{
-			additional_clay_robots -= 1;
-			ore -= blueprint.clay_robot_ore_cost;
-			Some(ResourceType::Clay)
-		}
-		else if additional_ore_robots > 0
-			&& ore >= blueprint.ore_robot_ore_cost
-		{
-			additional_ore_robots -= 1;
-			ore -= blueprint.ore_robot_ore_cost;
-			Some(ResourceType::Ore)
-		}
-		else
-		{
-			None
-		};
-		// Gain resources.
-		ore += num_ore_robots;
-		clay += num_clay_robots;
-		obsidian += num_obsidian_robots;
-		geodes += num_geode_robots;
-		// Finish construction.
-		if let Some(miner_type) = miner_type
-		{
-			match miner_type
+			ResourceType::Geode =>
 			{
-				ResourceType::Ore => num_ore_robots += 1,
-				ResourceType::Clay => num_clay_robots += 1,
-				ResourceType::Obsidian => num_obsidian_robots += 1,
-				ResourceType::Geode => num_geode_robots += 1,
+				self.ore >= blueprint.geode_robot_ore_cost
+					&& self.obsidian >= blueprint.geode_robot_obsidian_cost
+			}
+			ResourceType::Obsidian =>
+			{
+				self.ore >= blueprint.obsidian_robot_ore_cost
+					&& self.clay >= blueprint.obsidian_robot_clay_cost
+			}
+			ResourceType::Clay => self.ore >= blueprint.clay_robot_ore_cost,
+			ResourceType::Ore => self.ore >= blueprint.ore_robot_ore_cost,
+		}
+	}
+
+	fn pay(&mut self, robot_type: ResourceType, blueprint: Blueprint)
+	{
+		match robot_type
+		{
+			ResourceType::Geode =>
+			{
+				self.ore -= blueprint.geode_robot_ore_cost;
+				self.obsidian -= blueprint.geode_robot_obsidian_cost;
+			}
+			ResourceType::Obsidian =>
+			{
+				self.ore -= blueprint.obsidian_robot_ore_cost;
+				self.clay -= blueprint.obsidian_robot_clay_cost;
+			}
+			ResourceType::Clay =>
+			{
+				self.ore -= blueprint.clay_robot_ore_cost;
+			}
+			ResourceType::Ore =>
+			{
+				self.ore -= blueprint.ore_robot_ore_cost;
 			}
 		}
 	}
-	//dbg!(ore);
-	//dbg!(clay);
-	//dbg!(obsidian);
-	Outcome { num_geodes: geodes }
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+struct State
+{
+	world: World,
+	strategy: Strategy,
+	strategy_offset: usize,
+	time_remaining: i32,
+}
+
+fn run_simulation(
+	blueprint: Blueprint,
+	mut state: State,
+	stack: &mut Vec<State>,
+	max_num_geodes: Option<i32>,
+) -> i32
+{
+	while state.time_remaining > 0
+	{
+		if let Some(max_num_geodes) = max_num_geodes
+		{
+			let t = state.time_remaining;
+			let loose_upper_limit = state.world.geodes
+				+ t * state.world.num_geode_robots
+				+ (t - 1) * t / 2;
+			if loose_upper_limit < max_num_geodes
+			{
+				break;
+			}
+		}
+
+		step(blueprint, &mut state, stack);
+	}
+	state.world.geodes
+}
+
+fn step(blueprint: Blueprint, state: &mut State, stack: &mut Vec<State>)
+{
+	let world = &mut state.world;
+	let strategy = &mut state.strategy;
+
+	// Choose what mining robot to buy next.
+	let dictated_type = strategy.choices.get(state.strategy_offset).cloned();
+	let chosen_type = if let Some(dictated_type) = dictated_type
+	{
+		dictated_type
+	}
+	else
+	{
+		let chosen_type = if world.num_obsidian_robots > 0
+		{
+			ResourceType::Geode
+		}
+		else if world.num_clay_robots > 0
+		{
+			ResourceType::Obsidian
+		}
+		else
+		{
+			ResourceType::Clay
+		};
+		let alternative_choices = [
+			ResourceType::Ore,
+			ResourceType::Clay,
+			ResourceType::Obsidian,
+		]
+		.into_iter()
+		.filter(|x| *x < chosen_type)
+		.filter(|x| match *x
+		{
+			ResourceType::Clay =>
+			{
+				let t = state.time_remaining - 4;
+				world.clay + t * world.num_clay_robots
+					< t * blueprint.obsidian_robot_clay_cost
+			}
+			ResourceType::Obsidian =>
+			{
+				let t = state.time_remaining - 2;
+				world.obsidian + t * world.num_obsidian_robots
+					< t * blueprint.geode_robot_obsidian_cost
+			}
+			_ => true,
+		});
+		for other in alternative_choices
+		{
+			let mut alt_strategy = strategy.clone();
+			alt_strategy.choices.push(other);
+			let alternative = State {
+				world: world.clone(),
+				strategy: alt_strategy,
+				strategy_offset: state.strategy_offset,
+				time_remaining: state.time_remaining,
+			};
+			stack.push(alternative);
+		}
+		strategy.choices.push(chosen_type);
+		chosen_type
+	};
+	// Pay for construction if we can afford the chosen mining robot, or wait.
+	let miner_type = if world.can_afford(chosen_type, blueprint)
+	{
+		world.pay(chosen_type, blueprint);
+		Some(chosen_type)
+	}
+	else
+	{
+		None
+	};
+	// Gain resources.
+	world.ore += world.num_ore_robots;
+	world.clay += world.num_clay_robots;
+	world.obsidian += world.num_obsidian_robots;
+	world.geodes += world.num_geode_robots;
+	// Finish construction.
+	if let Some(miner_type) = miner_type
+	{
+		match miner_type
+		{
+			ResourceType::Ore => world.num_ore_robots += 1,
+			ResourceType::Clay => world.num_clay_robots += 1,
+			ResourceType::Obsidian => world.num_obsidian_robots += 1,
+			ResourceType::Geode => world.num_geode_robots += 1,
+		}
+		state.strategy_offset += 1;
+	}
+	// Tick.
+	state.time_remaining -= 1;
 }
 
 #[cfg(test)]
@@ -196,12 +327,14 @@ mod tests
 	fn one_provided1_provided_strategy()
 	{
 		let blueprint = PROVIDED1.lines().next().unwrap().parse().unwrap();
-		let strategy = Strategy {
-			max_additional_ore_robots: 0,
-			max_clay_robots: 4,
-			max_obsidian_robots: 2,
-		};
-		let outcome = run_simulation(blueprint, strategy);
-		assert_eq!(outcome.num_geodes, 9);
+		let strategy = Strategy::parse("cccocoggg");
+		let mut state = State::default();
+		state.world.num_ore_robots = 1;
+		state.time_remaining = MAX_TIME;
+		state.strategy = strategy;
+		let mut stack = Vec::new();
+		let num_geodes = run_simulation(blueprint, state, &mut stack, None);
+		assert_eq!(num_geodes, 9);
+		assert!(stack.is_empty());
 	}
 }
