@@ -16,9 +16,12 @@ fn one(input: &str) -> i32
 	blueprints.map(determine_quality_level).sum()
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	let blueprints = input.lines().take(3).map(|line| line.parse().unwrap());
+	blueprints
+		.map(|blueprint| optimize_num_geodes(blueprint, MAX_TIME_PART_TWO))
+		.product()
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -43,14 +46,15 @@ struct Blueprint
 
 fn determine_quality_level(blueprint: Blueprint) -> i32
 {
-	dbg!(blueprint.blueprint_id) * dbg!(optimize_num_geodes(blueprint))
+	dbg!(blueprint.blueprint_id)
+		* dbg!(optimize_num_geodes(blueprint, MAX_TIME_PART_ONE))
 }
 
-fn optimize_num_geodes(blueprint: Blueprint) -> i32
+fn optimize_num_geodes(blueprint: Blueprint, time_allowed: i32) -> i32
 {
 	let mut starting_state = State::default();
 	starting_state.world.num_ore_robots = 1;
-	starting_state.time_remaining = MAX_TIME;
+	starting_state.time_remaining = time_allowed;
 	let mut max_num_geodes = 0;
 	let mut stack = Vec::new();
 	stack.push(starting_state);
@@ -67,8 +71,9 @@ fn optimize_num_geodes(blueprint: Blueprint) -> i32
 	max_num_geodes
 }
 
-const MAX_TIME: i32 = 24;
-const MAX_STRATEGY_LEN: usize = MAX_TIME as usize;
+const MAX_TIME_PART_ONE: i32 = 24;
+const MAX_TIME_PART_TWO: i32 = 32;
+const MAX_STRATEGY_LEN: usize = MAX_TIME_PART_TWO as usize;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 struct Strategy
@@ -330,11 +335,23 @@ mod tests
 		let strategy = Strategy::parse("cccocoggg");
 		let mut state = State::default();
 		state.world.num_ore_robots = 1;
-		state.time_remaining = MAX_TIME;
+		state.time_remaining = MAX_TIME_PART_ONE;
 		state.strategy = strategy;
 		let mut stack = Vec::new();
 		let num_geodes = run_simulation(blueprint, state, &mut stack, None);
 		assert_eq!(num_geodes, 9);
 		assert!(stack.is_empty());
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 56 * 62);
+	}
+
+	#[test]
+	fn two_provided1()
+	{
+		assert_eq!(two(PROVIDED1), 56);
 	}
 }
