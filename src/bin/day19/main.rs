@@ -46,9 +46,16 @@ fn determine_quality_level(blueprint: Blueprint) -> i32
 
 fn optimize_num_geodes(blueprint: Blueprint) -> i32
 {
+	let strategies = (1..MAX_TIME)
+		.flat_map(|o| (1..(MAX_TIME - o)).map(move |c| (o, c)))
+		.flat_map(|(o, c)| (0..(MAX_TIME - o - c)).map(move |x| (o, c, x)))
+		.map(|(o, c, x)| Strategy {
+			max_additional_ore_robots: x,
+			max_clay_robots: c,
+			max_obsidian_robots: o,
+		});
 	let mut max_num_geodes = 0;
-	let mut strategy = Strategy::default();
-	for _ in 0..MAX_TIME
+	for strategy in strategies
 	{
 		dbg!(strategy);
 		let outcome = run_simulation(blueprint, strategy);
@@ -57,11 +64,6 @@ fn optimize_num_geodes(blueprint: Blueprint) -> i32
 		{
 			max_num_geodes = outcome.num_geodes;
 		}
-		if outcome.num_penalties == 0
-		{
-			break;
-		}
-		strategy.max_additional_ore_robots += 1;
 	}
 	max_num_geodes
 }
@@ -72,13 +74,14 @@ const MAX_TIME: i32 = 24;
 struct Strategy
 {
 	max_additional_ore_robots: i32,
+	max_clay_robots: i32,
+	max_obsidian_robots: i32,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
 struct Outcome
 {
 	num_geodes: i32,
-	num_penalties: i32,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -100,58 +103,51 @@ fn run_simulation(blueprint: Blueprint, strategy: Strategy) -> Outcome
 	let mut clay = 0;
 	let mut obsidian = 0;
 	let mut geodes = 0;
-	let mut num_penalties = 0;
 	let Strategy {
 		max_additional_ore_robots,
+		max_clay_robots,
+		max_obsidian_robots,
 	} = strategy;
 	let mut additional_ore_robots = max_additional_ore_robots;
-	for time_remaining in (0..MAX_TIME).rev()
+	let mut additional_clay_robots = max_clay_robots;
+	let mut additional_obsidian_robots = max_obsidian_robots;
+	for _time_remaining in (0..MAX_TIME).rev()
 	{
 		// Choose what mining robot to buy.
-		let mut miner_type = None;
-		if obsidian >= blueprint.geode_robot_obsidian_cost
+		let miner_type = if ore >= blueprint.geode_robot_ore_cost
+			&& obsidian >= blueprint.geode_robot_obsidian_cost
 		{
-			if ore >= blueprint.geode_robot_ore_cost
-			{
-				miner_type = Some(ResourceType::Geode);
-				ore -= blueprint.geode_robot_ore_cost;
-				obsidian -= blueprint.geode_robot_obsidian_cost;
-			}
-			else
-			{
-				num_penalties += 1;
-			}
+			ore -= blueprint.geode_robot_ore_cost;
+			obsidian -= blueprint.geode_robot_obsidian_cost;
+			Some(ResourceType::Geode)
 		}
-		if miner_type.is_none()
+		else if additional_obsidian_robots > 0
+			&& ore >= blueprint.obsidian_robot_ore_cost
 			&& clay >= blueprint.obsidian_robot_clay_cost
-			&& time_remaining > blueprint.geode_robot_obsidian_cost + 2
 		{
-			if ore >= blueprint.obsidian_robot_ore_cost
-			{
-				miner_type = Some(ResourceType::Obsidian);
-				ore -= blueprint.obsidian_robot_ore_cost;
-				clay -= blueprint.obsidian_robot_clay_cost;
-			}
-			else
-			{
-				num_penalties += 1;
-			}
+			additional_obsidian_robots -= 1;
+			ore -= blueprint.obsidian_robot_ore_cost;
+			clay -= blueprint.obsidian_robot_clay_cost;
+			Some(ResourceType::Obsidian)
 		}
-		if miner_type.is_none()
+		else if additional_clay_robots > 0
+			&& ore >= blueprint.clay_robot_ore_cost
 		{
-			if additional_ore_robots == 0
-				&& ore >= blueprint.clay_robot_ore_cost
-			{
-				miner_type = Some(ResourceType::Clay);
-				ore -= blueprint.clay_robot_ore_cost;
-			}
-			else if ore >= blueprint.ore_robot_ore_cost
-			{
-				miner_type = Some(ResourceType::Ore);
-				ore -= blueprint.ore_robot_ore_cost;
-				additional_ore_robots -= 1;
-			}
+			additional_clay_robots -= 1;
+			ore -= blueprint.clay_robot_ore_cost;
+			Some(ResourceType::Clay)
 		}
+		else if additional_ore_robots > 0
+			&& ore >= blueprint.ore_robot_ore_cost
+		{
+			additional_ore_robots -= 1;
+			ore -= blueprint.ore_robot_ore_cost;
+			Some(ResourceType::Ore)
+		}
+		else
+		{
+			None
+		};
 		// Gain resources.
 		ore += num_ore_robots;
 		clay += num_clay_robots;
@@ -169,13 +165,10 @@ fn run_simulation(blueprint: Blueprint, strategy: Strategy) -> Outcome
 			}
 		}
 	}
-	dbg!(ore);
-	dbg!(clay);
-	dbg!(obsidian);
-	Outcome {
-		num_geodes: geodes,
-		num_penalties,
-	}
+	//dbg!(ore);
+	//dbg!(clay);
+	//dbg!(obsidian);
+	Outcome { num_geodes: geodes }
 }
 
 #[cfg(test)]
@@ -185,10 +178,30 @@ mod tests
 	use pretty_assertions::assert_eq;
 
 	const PROVIDED: &str = include_str!("provided.txt");
+	const PROVIDED1: &str = include_str!("provided1.txt");
 
 	#[test]
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 33);
+	}
+
+	#[test]
+	fn one_provided1()
+	{
+		assert_eq!(one(PROVIDED1), 9);
+	}
+
+	#[test]
+	fn one_provided1_provided_strategy()
+	{
+		let blueprint = PROVIDED1.lines().next().unwrap().parse().unwrap();
+		let strategy = Strategy {
+			max_additional_ore_robots: 0,
+			max_clay_robots: 4,
+			max_obsidian_robots: 2,
+		};
+		let outcome = run_simulation(blueprint, strategy);
+		assert_eq!(outcome.num_geodes, 9);
 	}
 }
