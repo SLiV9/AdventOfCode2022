@@ -10,17 +10,18 @@ pub fn main()
 	println!("Part Two: {}", two(INPUT));
 }
 
-fn one(input: &str) -> i32
+fn one(input: &str) -> i64
 {
 	let numbers = input.lines().map(|line| line.parse().unwrap());
-	let mut data: Vec<i32> = numbers.collect();
+	let mut data: Vec<i64> = numbers.collect();
 	let n = data.len() - 1;
 	// Force uniqueness while keeping equality modulo n.
-	let min_value = data.iter().min();
-	let max_value = data.iter().max();
+	let min_value = data.iter().min().unwrap();
+	let max_value = data.iter().max().unwrap();
 	dbg!(min_value);
 	dbg!(max_value);
-	let k = i32::try_from(10000 * n).unwrap();
+	let largest_value = std::cmp::max(min_value.abs(), max_value.abs());
+	let k = largest_value * i64::try_from(n).unwrap();
 	dbg!(k);
 	make_unique(&mut data, k);
 	let commands = data.clone().into_iter();
@@ -37,12 +38,45 @@ fn one(input: &str) -> i32
 	dbg!(x) + dbg!(y) + dbg!(z)
 }
 
-fn two(_input: &str) -> i32
+const DECRYPTION_KEY: i64 = 811589153;
+
+fn two(input: &str) -> i64
 {
-	0
+	let numbers = input.lines().map(|line| line.parse().unwrap());
+	let mut data: Vec<i64> = numbers.collect();
+	let n = data.len() - 1;
+	// Multiply by decryption key.
+	for value in data.iter_mut()
+	{
+		*value *= DECRYPTION_KEY;
+	}
+	// Force uniqueness while keeping equality modulo n.
+	let min_value = data.iter().min().unwrap();
+	let max_value = data.iter().max().unwrap();
+	dbg!(min_value);
+	dbg!(max_value);
+	let largest_value = std::cmp::max(min_value.abs(), max_value.abs());
+	let k = largest_value * i64::try_from(n).unwrap();
+	dbg!(k);
+	make_unique(&mut data, k);
+	let commands = data.clone();
+	// Perform the mixing.
+	for _ in 0..10
+	{
+		for value in &commands
+		{
+			mix_1(*value, &mut data);
+		}
+	}
+	// Get the answer.
+	let start = data.iter().position(|v| *v == 0).unwrap();
+	let x = data[(start + 1000) % data.len()];
+	let y = data[(start + 2000) % data.len()];
+	let z = data[(start + 3000) % data.len()];
+	dbg!(x) + dbg!(y) + dbg!(z)
 }
 
-fn mix_1(value: i32, data: &mut [i32])
+fn mix_1(value: i64, data: &mut [i64])
 {
 	let n = data.len() - 1;
 	let i = data.iter().position(|v| *v == value).unwrap();
@@ -81,9 +115,9 @@ fn mix_1(value: i32, data: &mut [i32])
 	}
 }
 
-fn make_unique(data: &mut [i32], k: i32)
+fn make_unique(data: &mut [i64], k: i64)
 {
-	let mut set: HashSet<i32> = HashSet::new();
+	let mut set: HashSet<i64> = HashSet::new();
 	for value in data.iter_mut()
 	{
 		while set.insert(*value) == false
@@ -121,6 +155,12 @@ mod tests
 	}
 
 	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 1623178306);
+	}
+
+	#[test]
 	fn one_duplicate()
 	{
 		// 1, 2, -3, 0, 3, -3, -2
@@ -153,7 +193,7 @@ mod tests
 		assert_eq!(shifted([1, -7, 0], -7), [-7, 1, 0]);
 	}
 
-	fn shifted<const N: usize>(mut data: [i32; N], value: i32) -> [i32; N]
+	fn shifted<const N: usize>(mut data: [i64; N], value: i64) -> [i64; N]
 	{
 		mix_1(value, &mut data);
 		data
