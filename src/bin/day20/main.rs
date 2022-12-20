@@ -14,28 +14,10 @@ fn one(input: &str) -> i64
 {
 	let numbers = input.lines().map(|line| line.parse().unwrap());
 	let mut data: Vec<i64> = numbers.collect();
-	let n = data.len() - 1;
-	// Force uniqueness while keeping equality modulo n.
-	let min_value = data.iter().min().unwrap();
-	let max_value = data.iter().max().unwrap();
-	dbg!(min_value);
-	dbg!(max_value);
-	let largest_value = std::cmp::max(min_value.abs(), max_value.abs());
-	let k = largest_value * i64::try_from(n).unwrap();
-	dbg!(k);
-	make_unique(&mut data, k);
-	let commands = data.clone().into_iter();
-	// Perform the mixing.
-	for value in commands
-	{
-		mix_1(value, &mut data);
-	}
-	// Get the answer.
-	let start = data.iter().position(|v| *v == 0).unwrap();
-	let x = data[(start + 1000) % data.len()] % k;
-	let y = data[(start + 2000) % data.len()] % k;
-	let z = data[(start + 3000) % data.len()] % k;
-	dbg!(x) + dbg!(y) + dbg!(z)
+	let k = make_unique(&mut data);
+	let commands = data.clone();
+	mix(&mut data, &commands);
+	extract_answer(&data, k)
 }
 
 const DECRYPTION_KEY: i64 = 811589153;
@@ -44,41 +26,30 @@ fn two(input: &str) -> i64
 {
 	let numbers = input.lines().map(|line| line.parse().unwrap());
 	let mut data: Vec<i64> = numbers.collect();
-	let n = data.len() - 1;
-	// Multiply by decryption key.
 	for value in data.iter_mut()
 	{
 		*value *= DECRYPTION_KEY;
 	}
-	// Force uniqueness while keeping equality modulo n.
-	let min_value = data.iter().min().unwrap();
-	let max_value = data.iter().max().unwrap();
-	dbg!(min_value);
-	dbg!(max_value);
-	let largest_value = std::cmp::max(min_value.abs(), max_value.abs());
-	let k = largest_value * i64::try_from(n).unwrap();
-	dbg!(k);
-	make_unique(&mut data, k);
+	let k = make_unique(&mut data);
 	let commands = data.clone();
-	// Perform the mixing.
 	for _ in 0..10
 	{
-		for value in &commands
-		{
-			mix_1(*value, &mut data);
-		}
+		mix(&mut data, &commands);
 	}
-	// Get the answer.
-	let start = data.iter().position(|v| *v == 0).unwrap();
-	let x = data[(start + 1000) % data.len()] % k;
-	let y = data[(start + 2000) % data.len()] % k;
-	let z = data[(start + 3000) % data.len()] % k;
-	let answer = dbg!(x) + dbg!(y) + dbg!(z);
+	let answer = extract_answer(&data, k);
 	assert_eq!(answer % DECRYPTION_KEY, 0);
 	answer
 }
 
-fn mix_1(value: i64, data: &mut [i64])
+fn mix(data: &mut [i64], commands: &[i64])
+{
+	for value in commands
+	{
+		mix_1(data, *value);
+	}
+}
+
+fn mix_1(data: &mut [i64], value: i64)
 {
 	let n = data.len() - 1;
 	let i = data.iter().position(|v| *v == value).unwrap();
@@ -117,8 +88,16 @@ fn mix_1(value: i64, data: &mut [i64])
 	}
 }
 
-fn make_unique(data: &mut [i64], k: i64)
+fn make_unique(data: &mut [i64]) -> i64
 {
+	let n = data.len() - 1;
+	// Force uniqueness while keeping equality modulo n.
+	let min_value = data.iter().min().unwrap();
+	let max_value = data.iter().max().unwrap();
+	dbg!(min_value);
+	dbg!(max_value);
+	let largest_value = std::cmp::max(min_value.abs(), max_value.abs());
+	let k = largest_value * i64::try_from(n).unwrap();
 	let mut set: HashSet<i64> = HashSet::new();
 	for value in data.iter_mut()
 	{
@@ -138,6 +117,16 @@ fn make_unique(data: &mut [i64], k: i64)
 			}
 		}
 	}
+	dbg!(k)
+}
+
+fn extract_answer(data: &[i64], k: i64) -> i64
+{
+	let start = data.iter().position(|v| *v == 0).unwrap();
+	let x = data[(start + 1000) % data.len()] % k;
+	let y = data[(start + 2000) % data.len()] % k;
+	let z = data[(start + 3000) % data.len()] % k;
+	dbg!(x) + dbg!(y) + dbg!(z)
 }
 
 #[cfg(test)]
@@ -197,7 +186,7 @@ mod tests
 
 	fn shifted<const N: usize>(mut data: [i64; N], value: i64) -> [i64; N]
 	{
-		mix_1(value, &mut data);
+		mix_1(&mut data, value);
 		data
 	}
 }
