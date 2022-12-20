@@ -70,10 +70,12 @@ fn two(input: &str) -> i64
 	}
 	// Get the answer.
 	let start = data.iter().position(|v| *v == 0).unwrap();
-	let x = data[(start + 1000) % data.len()];
-	let y = data[(start + 2000) % data.len()];
-	let z = data[(start + 3000) % data.len()];
-	dbg!(x) + dbg!(y) + dbg!(z)
+	let x = data[(start + 1000) % data.len()] % k;
+	let y = data[(start + 2000) % data.len()] % k;
+	let z = data[(start + 3000) % data.len()] % k;
+	let answer = dbg!(x) + dbg!(y) + dbg!(z);
+	assert_eq!(answer % DECRYPTION_KEY, 0);
+	answer
 }
 
 fn mix_1(value: i64, data: &mut [i64])
