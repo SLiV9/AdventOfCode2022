@@ -1,3 +1,3 @@
 sjmn: 50
-root: pppw + sjmn
-pppw: 150
+root: humn + sjmn
+humn: 150
