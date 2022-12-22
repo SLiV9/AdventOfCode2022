@@ -457,7 +457,7 @@ const INPUT_CUBE_CONFIGURATION: [Configuration; NUM_SIDES] = [
 	Configuration {
 		left: Edge { side: 3, facing: Facing::Down },
 		right: Edge { side: 1, facing: Facing::Up },
-		up: Edge { side: 0, facing: Facing::Down },
+		up: Edge { side: 0, facing: Facing::Up },
 		down: Edge { side: 4, facing: Facing::Down },
 	},
 	Configuration {
