@@ -128,7 +128,7 @@ impl Finger
 					(Facing::Right, Facing::Down) => (1, max + 1 - r),
 					(Facing::Down, Facing::Down) => (1, c),
 					(Facing::Left, Facing::Down) => (1, r),
-					(Facing::Up, Facing::Down) => (max, max + 1 - c),
+					(Facing::Up, Facing::Down) => (1, max + 1 - c),
 					(Facing::Right, Facing::Left) => (max + 1 - r, max),
 					(Facing::Down, Facing::Left) => (c, max),
 					(Facing::Left, Facing::Left) => (r, max),
