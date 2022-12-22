@@ -127,16 +127,18 @@ impl Finger
 					(Facing::Left, Facing::Left) => (r, max),
 					(Facing::Up, Facing::Up) => (max, c),
 					// Cube movement:
+					(Facing::Left, Facing::Right) => (max + 1 - r, 1),
 					(Facing::Left, Facing::Down) => (1, r),
 					(Facing::Left, Facing::Up) => (max, max + 1 - r),
 					(Facing::Right, Facing::Down) => (1, max + 1 - r),
 					(Facing::Right, Facing::Left) => (max + 1 - r, max),
+					(Facing::Right, Facing::Up) => (max, r),
 					(Facing::Up, Facing::Right) => (c, 1),
 					(Facing::Up, Facing::Down) => (max, max + 1 - c),
 					(Facing::Up, Facing::Left) => (max + 1 - c, max),
 					(Facing::Down, Facing::Right) => (max + 1 - c, 1),
+					(Facing::Down, Facing::Left) => (c, max),
 					(Facing::Down, Facing::Up) => (max, max + 1 - c),
-					_ => unimplemented!(),
 				};
 				match puzzle.sides[new_side][new_row][new_col]
 				{
@@ -150,9 +152,9 @@ impl Finger
 					b'#' => (),
 					_ => unreachable!(),
 				}
-				dbg!(code);
-				dbg!(self.side);
-				dbg!(self.facing);
+				//dbg!(code);
+				//dbg!(self.side);
+				//dbg!(self.facing);
 			}
 		}
 	}
@@ -266,7 +268,7 @@ impl Puzzle
 				}
 			}
 		}
-		dbg!(chunk_rc_of_side);
+		//dbg!(chunk_rc_of_side);
 		if is_cube
 		{
 			// Part two: cube.
@@ -443,40 +445,40 @@ impl Edge
 #[rustfmt::skip]
 const INPUT_CUBE_CONFIGURATION: [Configuration; NUM_SIDES] = [
 	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
+		left: Edge { side: 3, facing: Facing::Right },
+		right: Edge { side: 1, facing: Facing::Right },
+		up: Edge { side: 5, facing: Facing::Right },
+		down: Edge { side: 2, facing: Facing::Down },
+	},
+	Configuration {
+		left: Edge { side: 0, facing: Facing::Left },
+		right: Edge { side: 4, facing: Facing::Left },
+		up: Edge { side: 5, facing: Facing::Up },
+		down: Edge { side: 2, facing: Facing::Left },
+	},
+	Configuration {
+		left: Edge { side: 3, facing: Facing::Down },
+		right: Edge { side: 1, facing: Facing::Up },
+		up: Edge { side: 0, facing: Facing::Down },
 		down: Edge { side: 4, facing: Facing::Down },
 	},
 	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
-		down: Edge { side: 4, facing: Facing::Down },
+		left: Edge { side: 0, facing: Facing::Right },
+		right: Edge { side: 4, facing: Facing::Right },
+		up: Edge { side: 2, facing: Facing::Right },
+		down: Edge { side: 5, facing: Facing::Down },
 	},
 	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
-		down: Edge { side: 4, facing: Facing::Down },
+		left: Edge { side: 3, facing: Facing::Left },
+		right: Edge { side: 1, facing: Facing::Left },
+		up: Edge { side: 2, facing: Facing::Up },
+		down: Edge { side: 5, facing: Facing::Left },
 	},
 	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
-		down: Edge { side: 4, facing: Facing::Down },
-	},
-	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
-		down: Edge { side: 4, facing: Facing::Down },
-	},
-	Configuration {
-		left: Edge { side: 1, facing: Facing::Left },
-		right: Edge { side: 3, facing: Facing::Right },
-		up: Edge { side: 0, facing: Facing::Up },
-		down: Edge { side: 4, facing: Facing::Down },
+		left: Edge { side: 0, facing: Facing::Down },
+		right: Edge { side: 4, facing: Facing::Up },
+		up: Edge { side: 3, facing: Facing::Up },
+		down: Edge { side: 1, facing: Facing::Down },
 	},
 ];
 
