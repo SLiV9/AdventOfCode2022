@@ -121,24 +121,22 @@ impl Finger
 				let max = puzzle.radius;
 				let (new_row, new_col) = match (self.facing, new_facing)
 				{
-					// Normal movement:
 					(Facing::Right, Facing::Right) => (r, 1),
-					(Facing::Down, Facing::Down) => (1, c),
-					(Facing::Left, Facing::Left) => (r, max),
-					(Facing::Up, Facing::Up) => (max, c),
-					// Cube movement:
-					(Facing::Left, Facing::Right) => (max + 1 - r, 1),
-					(Facing::Left, Facing::Down) => (1, r),
-					(Facing::Left, Facing::Up) => (max, max + 1 - r),
-					(Facing::Right, Facing::Down) => (1, max + 1 - r),
-					(Facing::Right, Facing::Left) => (max + 1 - r, max),
-					(Facing::Right, Facing::Up) => (max, r),
-					(Facing::Up, Facing::Right) => (c, 1),
-					(Facing::Up, Facing::Down) => (max, max + 1 - c),
-					(Facing::Up, Facing::Left) => (max + 1 - c, max),
 					(Facing::Down, Facing::Right) => (max + 1 - c, 1),
+					(Facing::Left, Facing::Right) => (max + 1 - r, 1),
+					(Facing::Up, Facing::Right) => (c, 1),
+					(Facing::Right, Facing::Down) => (1, max + 1 - r),
+					(Facing::Down, Facing::Down) => (1, c),
+					(Facing::Left, Facing::Down) => (1, r),
+					(Facing::Up, Facing::Down) => (max, max + 1 - c),
+					(Facing::Right, Facing::Left) => (max + 1 - r, max),
 					(Facing::Down, Facing::Left) => (c, max),
+					(Facing::Left, Facing::Left) => (r, max),
+					(Facing::Up, Facing::Left) => (max + 1 - c, max),
+					(Facing::Right, Facing::Up) => (max, r),
 					(Facing::Down, Facing::Up) => (max, max + 1 - c),
+					(Facing::Left, Facing::Up) => (max, max + 1 - r),
+					(Facing::Up, Facing::Up) => (max, c),
 				};
 				match puzzle.sides[new_side][new_row][new_col]
 				{
