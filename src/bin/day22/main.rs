@@ -13,6 +13,11 @@ const INSTRUCTION_REGEX: &str = "(?P<steps>[0-9]+)|(?P<letter>[LR])";
 fn one(input: &str) -> i32
 {
 	let (grid_input, instruction_input) = input.split_once("\n\n").unwrap();
+	one_1(grid_input, instruction_input)
+}
+
+fn one_1(grid_input: &str, instruction_input: &str) -> i32
+{
 	let instruction_regex = regex::Regex::new(INSTRUCTION_REGEX).unwrap();
 	let puzzle = Puzzle::parse(grid_input);
 	let mut finger = Finger::default();
@@ -86,9 +91,14 @@ impl Finger
 				{
 					if puzzle.grid[self.row][self.col + 1] == 0
 					{
+						let old = self.col;
 						while puzzle.grid[self.row][self.col - 1] != 0
 						{
 							self.col -= 1;
+						}
+						if puzzle.grid[self.row][self.col] == b'#'
+						{
+							self.col = old;
 						}
 					}
 					else if puzzle.grid[self.row][self.col + 1] == b'#'
@@ -107,9 +117,14 @@ impl Finger
 				{
 					if puzzle.grid[self.row + 1][self.col] == 0
 					{
+						let old = self.row;
 						while puzzle.grid[self.row - 1][self.col] != 0
 						{
 							self.row -= 1;
+						}
+						if puzzle.grid[self.row][self.col] == b'#'
+						{
+							self.row = old;
 						}
 					}
 					else if puzzle.grid[self.row + 1][self.col] == b'#'
@@ -128,9 +143,14 @@ impl Finger
 				{
 					if puzzle.grid[self.row][self.col - 1] == 0
 					{
+						let old = self.col;
 						while puzzle.grid[self.row][self.col + 1] != 0
 						{
 							self.col += 1;
+						}
+						if puzzle.grid[self.row][self.col] == b'#'
+						{
+							self.col = old;
 						}
 					}
 					else if puzzle.grid[self.row][self.col - 1] == b'#'
@@ -149,9 +169,14 @@ impl Finger
 				{
 					if puzzle.grid[self.row - 1][self.col] == 0
 					{
+						let old = self.row;
 						while puzzle.grid[self.row + 1][self.col] != 0
 						{
 							self.row += 1;
+						}
+						if puzzle.grid[self.row][self.col] == b'#'
+						{
+							self.row = old;
 						}
 					}
 					else if puzzle.grid[self.row - 1][self.col] == b'#'
@@ -222,8 +247,8 @@ impl Facing
 
 // The puzzle grid is surrounded by 0 bytes which indicate the void.
 // This also means we do not have to do any bounds checking.
-const GRID_WIDTH: usize = 202;
-const GRID_HEIGHT: usize = 202;
+const GRID_WIDTH: usize = 256;
+const GRID_HEIGHT: usize = 256;
 
 #[derive(Debug)]
 struct Puzzle
@@ -263,10 +288,25 @@ mod tests
 	use pretty_assertions::assert_eq;
 
 	const PROVIDED: &str = include_str!("provided.txt");
+	const PROVIDED_GRID: &str = include_str!("provided_grid.txt");
 
 	#[test]
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 6032);
+	}
+
+	#[test]
+	fn one_provided_grid_with_samples()
+	{
+		assert_eq!(one_1(PROVIDED_GRID, "0"), 1036);
+		assert_eq!(one_1(PROVIDED_GRID, "1R"), 1041);
+		assert_eq!(one_1(PROVIDED_GRID, "2R"), 1045);
+		assert_eq!(one_1(PROVIDED_GRID, "3R"), 1045);
+		assert_eq!(one_1(PROVIDED_GRID, "1L"), 1043);
+		assert_eq!(one_1(PROVIDED_GRID, "2L"), 1047);
+		assert_eq!(one_1(PROVIDED_GRID, "1L1L1L1L"), 1036);
+		assert_eq!(one_1(PROVIDED_GRID, "RR1"), 1038);
+		assert_eq!(one_1(PROVIDED_GRID, "1RR1"), 1038);
 	}
 }
