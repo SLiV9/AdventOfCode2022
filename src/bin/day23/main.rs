@@ -18,13 +18,10 @@ fn one(input: &str) -> usize
 	grid.parse_input(input);
 	grid.dbg_print();
 	let count = grid.count();
-	for round in 1..=10
+	for _round in 1..=10
 	{
-		println!("Round {}", round);
 		grid.expand();
-		grid.dbg_print();
 		grid.diffuse();
-		grid.dbg_print();
 		grid.collapse();
 		assert_eq!(grid.count(), count);
 		if !grid.is_active
@@ -32,8 +29,6 @@ fn one(input: &str) -> usize
 			break;
 		}
 	}
-	println!("Done");
-	grid.dbg_print();
 	grid.count_empty_spaces()
 }
 
@@ -41,11 +36,11 @@ fn two(input: &str) -> usize
 {
 	let mut grid = Grid::create();
 	grid.parse_input(input);
-	grid.dbg_print();
 	let count = grid.count();
-	let mut round = 1;
+	let mut round = 0;
 	while grid.is_active
 	{
+		round += 1;
 		println!("Round {}", round);
 		grid.expand();
 		grid.dbg_print();
@@ -53,12 +48,8 @@ fn two(input: &str) -> usize
 		grid.dbg_print();
 		grid.collapse();
 		assert_eq!(grid.count(), count);
-		round += 1;
-		break;
 	}
-	println!("Done");
-	grid.dbg_print();
-	grid.count_empty_spaces()
+	round
 }
 
 fn propose(
@@ -331,6 +322,12 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 110);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 20);
 	}
 
 	#[test]
