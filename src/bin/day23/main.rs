@@ -18,17 +18,22 @@ fn one(input: &str) -> usize
 	grid.parse_input(input);
 	grid.dbg_print();
 	let count = grid.count();
-	for _round in 1..=10
+	for round in 1..=10
 	{
+		//println!("Round {}", round);
+		let _ = round;
 		grid.expand();
 		grid.diffuse();
-		grid.collapse();
+		//grid.dbg_print();
 		assert_eq!(grid.count(), count);
 		if !grid.is_active
 		{
 			break;
 		}
 	}
+	grid.collapse();
+	assert_eq!(grid.count(), count);
+	grid.dbg_print();
 	grid.count_empty_spaces()
 }
 
@@ -41,25 +46,27 @@ fn two(input: &str) -> usize
 	while grid.is_active
 	{
 		round += 1;
-		println!("Round {}", round);
+		//println!("Round {}", round);
 		grid.expand();
-		grid.dbg_print();
+		//grid.dbg_print();
 		grid.diffuse();
-		grid.dbg_print();
-		grid.collapse();
+		//grid.dbg_print();
 		assert_eq!(grid.count(), count);
 	}
+	grid.collapse();
+	assert_eq!(grid.count(), count);
+	grid.dbg_print();
 	round
 }
 
 fn propose(
-	current: u128,
-	above: u128,
-	below: u128,
+	current: Row,
+	above: Row,
+	below: Row,
 	proposal_sequence: &[u8; PROPOSAL_SEQUENCE_LEN],
 ) -> Proposal
 {
-	if current == 0
+	if current.is_empty()
 	{
 		return Proposal::default();
 	}
@@ -106,45 +113,230 @@ fn propose(
 #[derive(Debug, Default, Clone)]
 struct Proposal
 {
-	stay: u128,
-	north: u128,
-	south: u128,
-	less: u128,
-	more: u128,
+	stay: Row,
+	north: Row,
+	south: Row,
+	less: Row,
+	more: Row,
 }
 
-fn block(a: u128, b: u128, c: u128, d: u128) -> u128
+fn block(a: Row, b: Row, c: Row, d: Row) -> Row
 {
 	(a & (b | c | d)) | (b & (c | d)) | (c & d)
 }
 
-fn resolve_block(blocked: u128, proposed: &mut u128, backup: &mut u128)
+fn resolve_block(blocked: Row, proposed: &mut Row, backup: &mut Row)
 {
 	let canceled = blocked & *proposed;
 	*proposed &= !canceled;
 	*backup |= canceled;
 }
 
-fn resolve_block_l(blocked: u128, proposed: &mut u128, backup: &mut u128)
+fn resolve_block_l(blocked: Row, proposed: &mut Row, backup: &mut Row)
 {
 	let canceled = blocked & *proposed;
 	*proposed &= !canceled;
 	*backup |= canceled << 1;
 }
 
-fn resolve_block_m(blocked: u128, proposed: &mut u128, backup: &mut u128)
+fn resolve_block_m(blocked: Row, proposed: &mut Row, backup: &mut Row)
 {
 	let canceled = blocked & *proposed;
 	*proposed &= !canceled;
 	*backup |= canceled >> 1;
 }
 
-const MAX_ROWS: usize = 128 + 1;
-const MAX_COLS: usize = 128;
+#[derive(Debug, Default, Clone, Copy)]
+struct Row([u128; MAX_WORDS]);
+
+impl Row
+{
+	fn is_empty(&self) -> bool
+	{
+		self.0.iter().all(|&word| word == 0)
+	}
+
+	fn set_bit(&mut self, offset: usize)
+	{
+		self.0[offset / WIDTH_OF_WORD] |= 1 << (offset % WIDTH_OF_WORD);
+	}
+
+	fn get_bit(&self, offset: usize) -> bool
+	{
+		(self.0[offset / WIDTH_OF_WORD] & (1 << (offset % WIDTH_OF_WORD))) != 0
+	}
+
+	fn count_ones(&self) -> u32
+	{
+		self.0.iter().map(|word| word.count_ones()).sum()
+	}
+
+	fn leading_zeros(&self) -> u32
+	{
+		if let Some(k) = self.0.iter().rposition(|&word| word != 0)
+		{
+			((MAX_WORDS - 1 - k) * WIDTH_OF_WORD) as u32
+				+ self.0[k].leading_zeros()
+		}
+		else
+		{
+			(MAX_WORDS * WIDTH_OF_WORD) as u32
+		}
+	}
+
+	fn trailing_zeros(&self) -> u32
+	{
+		if let Some(k) = self.0.iter().position(|&word| word != 0)
+		{
+			(k * WIDTH_OF_WORD) as u32 + self.0[k].trailing_zeros()
+		}
+		else
+		{
+			(MAX_WORDS * WIDTH_OF_WORD) as u32
+		}
+	}
+
+	#[allow(unused)]
+	fn dbg_print(&self, width: usize)
+	{
+		print!("| ");
+		for c in 0..width
+		{
+			if self.get_bit(c)
+			{
+				print!("#");
+			}
+			else
+			{
+				print!(".");
+			}
+		}
+		println!();
+	}
+}
+
+impl std::ops::Not for Row
+{
+	type Output = Row;
+
+	fn not(mut self) -> Row
+	{
+		for word in &mut self.0
+		{
+			*word = !*word;
+		}
+		self
+	}
+}
+
+impl std::ops::BitOr for Row
+{
+	type Output = Row;
+
+	fn bitor(mut self, rhs: Row) -> Row
+	{
+		self |= rhs;
+		self
+	}
+}
+
+impl std::ops::BitAnd for Row
+{
+	type Output = Row;
+
+	fn bitand(mut self, rhs: Row) -> Row
+	{
+		self &= rhs;
+		self
+	}
+}
+
+impl std::ops::BitOrAssign for Row
+{
+	fn bitor_assign(&mut self, rhs: Row)
+	{
+		for (a, b) in self.0.iter_mut().zip(rhs.0.iter())
+		{
+			*a |= b;
+		}
+	}
+}
+
+impl std::ops::BitAndAssign for Row
+{
+	fn bitand_assign(&mut self, rhs: Row)
+	{
+		for (a, b) in self.0.iter_mut().zip(rhs.0.iter())
+		{
+			*a &= b;
+		}
+	}
+}
+
+impl std::ops::Shl<usize> for Row
+{
+	type Output = Row;
+
+	fn shl(mut self, n: usize) -> Row
+	{
+		if n >= WIDTH_OF_WORD
+		{
+			let k = n / WIDTH_OF_WORD;
+			self.0.rotate_right(k);
+			self.0[0..k].fill(0);
+		}
+		let n = n % WIDTH_OF_WORD;
+		if n > 0
+		{
+			let mask = ((1u128 << (n + 1)) - 1) << (WIDTH_OF_WORD - n);
+			for i in (1..MAX_WORDS).rev()
+			{
+				let bits = self.0[i - 1] & mask;
+				self.0[i] <<= n;
+				self.0[i] |= bits >> (WIDTH_OF_WORD - n);
+			}
+			self.0[0] <<= n;
+		}
+		self
+	}
+}
+
+impl std::ops::Shr<usize> for Row
+{
+	type Output = Row;
+
+	fn shr(mut self, n: usize) -> Row
+	{
+		if n >= WIDTH_OF_WORD
+		{
+			let k = n / WIDTH_OF_WORD;
+			self.0[0..k].fill(0);
+			self.0.rotate_left(k);
+		}
+		let n = n % WIDTH_OF_WORD;
+		if n > 0
+		{
+			let mask = (1u128 << (n + 1)) - 1;
+			self.0[0] >>= n;
+			for i in 1..MAX_WORDS
+			{
+				let bits = self.0[i] & mask;
+				self.0[i - 1] |= bits << (WIDTH_OF_WORD - n);
+				self.0[i] >>= n;
+			}
+		}
+		self
+	}
+}
+
+const WIDTH_OF_WORD: usize = 128;
+const MAX_WORDS: usize = 4;
+const MAX_COLS: usize = WIDTH_OF_WORD * MAX_WORDS;
+const MAX_ROWS: usize = MAX_COLS + 1;
 
 struct Grid
 {
-	data: [u128; MAX_ROWS],
+	data: [Row; MAX_ROWS],
 	width: usize,
 	height: usize,
 	proposal_sequence: [u8; PROPOSAL_SEQUENCE_LEN],
@@ -156,7 +348,7 @@ impl Grid
 	fn create() -> Grid
 	{
 		Grid {
-			data: [0u128; MAX_ROWS],
+			data: [Row::default(); MAX_ROWS],
 			width: 0,
 			height: 0,
 			proposal_sequence: PROPOSAL_SEQUENCE,
@@ -181,7 +373,7 @@ impl Grid
 
 	fn set_at_rc(&mut self, r: usize, c: usize)
 	{
-		self.data[r] |= 1u128 << c;
+		self.data[r].set_bit(c);
 		if r + 1 > self.height
 		{
 			self.height = r + 1;
@@ -194,17 +386,33 @@ impl Grid
 
 	fn expand(&mut self)
 	{
-		// Add an empty row at the bottom and two at the top.
-		self.data[0..(self.height + 1)].rotate_left(self.height);
-		self.height += 3;
-		assert!(self.height <= MAX_ROWS);
-		// Add an empty column at the start and the end.
-		for row in &mut self.data
+		// Make sure there is an empty column at the start.
+		if self.data[0..self.height]
+			.iter()
+			.any(|row| row.trailing_zeros() == 0)
 		{
-			*row <<= 1;
+			for row in &mut self.data
+			{
+				*row = *row << 1;
+			}
+			self.width += 1;
 		}
-		self.width += 2;
 		assert!(self.width <= MAX_COLS);
+		// Add an empty row at the bottom and two at the top, if needed.
+		if !self.data[0].is_empty()
+		{
+			self.data[0..(self.height + 1)].rotate_left(self.height);
+			self.height += 1;
+		}
+		if !self.data[self.height - 1].is_empty()
+		{
+			self.height += 1;
+		}
+		if !self.data[self.height - 2].is_empty()
+		{
+			self.height += 1;
+		}
+		assert!(self.height <= MAX_ROWS);
 	}
 
 	fn diffuse(&mut self)
@@ -235,7 +443,7 @@ impl Grid
 			resolve_block_m(blocked, &mut curr.more, &mut curr.stay);
 			resolve_block(blocked, &mut next.north, &mut next.stay);
 			let arrived = prev.south | curr.less | curr.more | next.north;
-			if arrived != 0
+			if !arrived.is_empty()
 			{
 				self.is_active = true;
 			}
@@ -244,25 +452,27 @@ impl Grid
 			curr = next;
 		}
 		self.data[self.height - 2] |= prev.south;
-		assert_eq!(curr.less, 0);
-		assert_eq!(curr.stay, 0);
-		assert_eq!(curr.more, 0);
+		assert!(curr.less.is_empty());
+		assert!(curr.stay.is_empty());
+		assert!(curr.more.is_empty());
 		self.proposal_sequence.rotate_left(1);
 	}
 
 	fn collapse(&mut self)
 	{
 		// Trim empty rows.
-		let start = self.data.iter().position(|&row| row != 0).unwrap();
-		let end = self.data.iter().rposition(|&row| row != 0).unwrap() + 1;
+		let start = self.data.iter().position(|x| !x.is_empty()).unwrap();
+		let end = self.data.iter().rposition(|x| !x.is_empty()).unwrap() + 1;
 		self.data[0..end].rotate_left(start);
 		self.height = end - start;
 		// Trim empty columns.
-		let mask = self.data[0..self.height].iter().fold(0, |a, row| (a | row));
-		let n = mask.trailing_zeros();
+		let mask = self.data[0..self.height]
+			.iter()
+			.fold(Row::default(), |a, &row| (a | row));
+		let n = mask.trailing_zeros() as usize;
 		for row in &mut self.data
 		{
-			*row >>= n;
+			*row = (*row) >> n;
 		}
 		self.width = MAX_COLS - n as usize - mask.leading_zeros() as usize;
 	}
@@ -271,16 +481,13 @@ impl Grid
 	{
 		self.data[0..self.height]
 			.iter()
-			.map(|word| word.count_ones() as usize)
+			.map(|row| row.count_ones() as usize)
 			.sum()
 	}
 
 	fn count_empty_spaces(&self) -> usize
 	{
-		self.data[0..self.height]
-			.iter()
-			.map(|word| self.width - word.count_ones() as usize)
-			.sum()
+		self.width * self.height - self.count()
 	}
 
 	#[allow(unused)]
@@ -289,21 +496,7 @@ impl Grid
 		println!();
 		for row in &self.data[0..self.height]
 		{
-			print!("| ");
-			let mut mask = *row;
-			for c in 0..self.width
-			{
-				if mask & 0x01 != 0
-				{
-					print!("#");
-				}
-				else
-				{
-					print!(".");
-				}
-				mask >>= 1;
-			}
-			println!();
+			row.dbg_print(self.width);
 		}
 		println!();
 	}
@@ -343,5 +536,46 @@ mod tests
 		let _ = one("###\n#.#\n###\n");
 		let _ = one("##.##\n##.##\n##.##\n");
 		let _ = one(&INPUT[0..200]);
+	}
+
+	#[test]
+	fn row_assertions()
+	{
+		let mut row = Row::default();
+		let max = MAX_COLS as u32;
+		assert_eq!(row.count_ones(), 0);
+		assert_eq!(row.leading_zeros(), max);
+		assert_eq!(row.trailing_zeros(), max);
+		row.set_bit(4);
+		assert_eq!(row.count_ones(), 1);
+		assert_eq!(row.leading_zeros(), max - 4 - 1);
+		assert_eq!(row.trailing_zeros(), 4);
+		row.set_bit(200);
+		assert_eq!(row.count_ones(), 2);
+		assert_eq!(row.leading_zeros(), max - 200 - 1);
+		assert_eq!(row.trailing_zeros(), 4);
+		row.set_bit(126);
+		row.set_bit(127);
+		row.set_bit(128);
+		row.set_bit(129);
+		assert_eq!(row.count_ones(), 6);
+		assert_eq!(row.leading_zeros(), max - 200 - 1);
+		assert_eq!(row.trailing_zeros(), 4);
+		row = row >> 1;
+		assert_eq!(row.count_ones(), 6);
+		assert_eq!(row.leading_zeros(), max - 200);
+		assert_eq!(row.trailing_zeros(), 4 - 1);
+		row = row << 2;
+		assert_eq!(row.count_ones(), 6);
+		assert_eq!(row.leading_zeros(), max - 200 - 2);
+		assert_eq!(row.trailing_zeros(), 4 + 1);
+		row = row << WIDTH_OF_WORD;
+		assert_eq!(row.count_ones(), 6);
+		assert_eq!(row.leading_zeros(), max - 200 - 2 - WIDTH_OF_WORD as u32);
+		assert_eq!(row.trailing_zeros(), 4 + 1 + WIDTH_OF_WORD as u32);
+		row = row >> (WIDTH_OF_WORD + 1);
+		assert_eq!(row.count_ones(), 6);
+		assert_eq!(row.leading_zeros(), max - 200 - 1);
+		assert_eq!(row.trailing_zeros(), 4);
 	}
 }
