@@ -16,7 +16,6 @@ fn one(input: &str) -> usize
 {
 	let mut grid = Grid::create();
 	grid.parse_input(input);
-	grid.dbg_print();
 	let count = grid.count();
 	for round in 1..=10
 	{
@@ -25,15 +24,15 @@ fn one(input: &str) -> usize
 		grid.expand();
 		grid.diffuse();
 		//grid.dbg_print();
-		assert_eq!(grid.count(), count);
+		debug_assert_eq!(grid.count(), count);
 		if !grid.is_active
 		{
 			break;
 		}
 	}
 	grid.collapse();
-	assert_eq!(grid.count(), count);
-	grid.dbg_print();
+	debug_assert_eq!(grid.count(), count);
+	//grid.dbg_print();
 	grid.count_empty_spaces()
 }
 
@@ -51,24 +50,25 @@ fn two(input: &str) -> usize
 		//grid.dbg_print();
 		grid.diffuse();
 		//grid.dbg_print();
-		assert_eq!(grid.count(), count);
+		debug_assert_eq!(grid.count(), count);
 	}
 	grid.collapse();
-	assert_eq!(grid.count(), count);
-	grid.dbg_print();
+	debug_assert_eq!(grid.count(), count);
+	//grid.dbg_print();
 	round
 }
 
 fn propose(
+	proposal: &mut Proposal,
 	current: Row,
 	above: Row,
 	below: Row,
 	proposal_sequence: &[u8; PROPOSAL_SEQUENCE_LEN],
-) -> Proposal
+)
 {
 	if current.is_empty()
 	{
-		return Proposal::default();
+		return;
 	}
 	let l = current << 1;
 	let m = current >> 1;
@@ -76,7 +76,6 @@ fn propose(
 	let below3 = below | (below >> 1) | (below << 1);
 	let happy = current & !l & !m & !above3 & !below3;
 	let mut unhappy = current & !happy;
-	let mut proposal = Proposal::default();
 	for proposed_direction in proposal_sequence.iter().map(|x| *x)
 	{
 		match proposed_direction
@@ -107,7 +106,6 @@ fn propose(
 		}
 	}
 	proposal.stay = happy | unhappy;
-	proposal
 }
 
 #[derive(Debug, Default, Clone)]
@@ -118,11 +116,6 @@ struct Proposal
 	south: Row,
 	less: Row,
 	more: Row,
-}
-
-fn block(a: Row, b: Row, c: Row, d: Row) -> Row
-{
-	(a & (b | c | d)) | (b & (c | d)) | (c & d)
 }
 
 fn resolve_block(blocked: Row, proposed: &mut Row, backup: &mut Row)
@@ -330,7 +323,7 @@ impl std::ops::Shr<usize> for Row
 }
 
 const WIDTH_OF_WORD: usize = 128;
-const MAX_WORDS: usize = 4;
+const MAX_WORDS: usize = 2;
 const MAX_COLS: usize = WIDTH_OF_WORD * MAX_WORDS;
 const MAX_ROWS: usize = MAX_COLS + 1;
 
@@ -397,7 +390,7 @@ impl Grid
 			}
 			self.width += 1;
 		}
-		assert!(self.width <= MAX_COLS);
+		debug_assert!(self.width <= MAX_COLS);
 		// Add an empty row at the bottom and two at the top, if needed.
 		if !self.data[0].is_empty()
 		{
@@ -412,49 +405,58 @@ impl Grid
 		{
 			self.height += 1;
 		}
-		assert!(self.height <= MAX_ROWS);
+		debug_assert!(self.height <= MAX_ROWS);
 	}
 
 	fn diffuse(&mut self)
 	{
 		self.is_active = false;
-		assert!(self.height >= 3);
-		let mut prev = Proposal::default();
-		let mut curr = propose(
+		debug_assert!(self.height >= 3);
+		let mut prev_south = Row::default();
+		let mut curr = Proposal::default();
+		propose(
+			&mut curr,
 			self.data[1],
 			self.data[0],
 			self.data[2],
 			&self.proposal_sequence,
 		);
 		self.data[0] = curr.north;
+		let mut next;
 		for r_of_prev in 0..(self.height - 3)
 		{
 			let r_of_current = r_of_prev + 1;
 			let r_of_next = r_of_prev + 2;
-			let mut next = propose(
+			next = Proposal::default();
+			propose(
+				&mut next,
 				self.data[r_of_next],
 				self.data[r_of_next - 1],
 				self.data[r_of_next + 1],
 				&self.proposal_sequence,
 			);
-			let blocked = block(prev.south, curr.less, curr.more, next.north);
-			resolve_block(blocked, &mut prev.south, &mut self.data[r_of_prev]);
+			// Reddit user /u/dcclct13 noticed that blocks can only occur
+			// between two opposite elves, because they check diagonally.
+			// So we check north/south first and then east/west.
+			let blocked = prev_south & next.north;
+			resolve_block(blocked, &mut prev_south, &mut self.data[r_of_prev]);
+			resolve_block(blocked, &mut next.north, &mut next.stay);
+			let blocked = curr.less & curr.more;
 			resolve_block_l(blocked, &mut curr.less, &mut curr.stay);
 			resolve_block_m(blocked, &mut curr.more, &mut curr.stay);
-			resolve_block(blocked, &mut next.north, &mut next.stay);
-			let arrived = prev.south | curr.less | curr.more | next.north;
+			let arrived = prev_south | curr.less | curr.more | next.north;
 			if !arrived.is_empty()
 			{
 				self.is_active = true;
 			}
 			self.data[r_of_current] = curr.stay | arrived;
-			prev = curr;
+			prev_south = curr.south;
 			curr = next;
 		}
-		self.data[self.height - 2] |= prev.south;
-		assert!(curr.less.is_empty());
-		assert!(curr.stay.is_empty());
-		assert!(curr.more.is_empty());
+		self.data[self.height - 2] |= prev_south;
+		debug_assert!(curr.less.is_empty());
+		debug_assert!(curr.stay.is_empty());
+		debug_assert!(curr.more.is_empty());
 		self.proposal_sequence.rotate_left(1);
 	}
 
