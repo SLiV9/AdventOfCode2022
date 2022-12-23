@@ -133,6 +133,20 @@ fn resolve_block(blocked: u128, proposed: &mut u128, backup: &mut u128)
 	*backup |= canceled;
 }
 
+fn resolve_block_l(blocked: u128, proposed: &mut u128, backup: &mut u128)
+{
+	let canceled = blocked & *proposed;
+	*proposed &= !canceled;
+	*backup |= canceled << 1;
+}
+
+fn resolve_block_m(blocked: u128, proposed: &mut u128, backup: &mut u128)
+{
+	let canceled = blocked & *proposed;
+	*proposed &= !canceled;
+	*backup |= canceled >> 1;
+}
+
 const MAX_ROWS: usize = 128 + 1;
 const MAX_COLS: usize = 128;
 
@@ -225,8 +239,8 @@ impl Grid
 			);
 			let blocked = block(prev.south, curr.less, curr.more, next.north);
 			resolve_block(blocked, &mut prev.south, &mut self.data[r_of_prev]);
-			resolve_block(blocked, &mut curr.less, &mut curr.stay);
-			resolve_block(blocked, &mut curr.more, &mut curr.stay);
+			resolve_block_l(blocked, &mut curr.less, &mut curr.stay);
+			resolve_block_m(blocked, &mut curr.more, &mut curr.stay);
 			resolve_block(blocked, &mut next.north, &mut next.stay);
 			let arrived = prev.south | curr.less | curr.more | next.north;
 			if arrived != 0
@@ -322,5 +336,14 @@ mod tests
 	fn one_mini()
 	{
 		assert_eq!(one(MINI), 25);
+	}
+
+	#[test]
+	fn one_assertions()
+	{
+		let _ = one("###\n###\n###\n");
+		let _ = one("###\n#.#\n###\n");
+		let _ = one("##.##\n##.##\n##.##\n");
+		let _ = one(&INPUT[0..200]);
 	}
 }
