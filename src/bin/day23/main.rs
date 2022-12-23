@@ -54,6 +54,7 @@ fn two(input: &str) -> usize
 		grid.collapse();
 		assert_eq!(grid.count(), count);
 		round += 1;
+		break;
 	}
 	println!("Done");
 	grid.dbg_print();
