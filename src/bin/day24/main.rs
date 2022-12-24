@@ -22,9 +22,28 @@ fn one(input: &str) -> i32
 	t
 }
 
-fn two(_input: &str) -> i32
+fn two(input: &str) -> i32
 {
-	0
+	let mut grid = Grid::parse(input);
+	let mut t = 0;
+	while !grid.has_reached_exit()
+	{
+		t += 1;
+		grid.step();
+	}
+	grid.continue_from_exit();
+	while !grid.has_reached_start()
+	{
+		t += 1;
+		grid.step();
+	}
+	grid.continue_from_start();
+	while !grid.has_reached_exit()
+	{
+		t += 1;
+		grid.step();
+	}
+	t
 }
 
 #[allow(dead_code)]
@@ -94,9 +113,26 @@ impl Grid
 		}
 	}
 
+	fn has_reached_start(&self) -> bool
+	{
+		(self.presence[0] & (1 << 1)) != 0
+	}
+
 	fn has_reached_exit(&self) -> bool
 	{
 		(self.presence[self.height - 1] & (1 << (self.width - 2))) != 0
+	}
+
+	fn continue_from_start(&mut self)
+	{
+		self.presence.fill(0);
+		self.presence[0] |= 1 << 1;
+	}
+
+	fn continue_from_exit(&mut self)
+	{
+		self.presence.fill(0);
+		self.presence[self.height - 1] |= 1 << (self.width - 2);
 	}
 
 	fn step(&mut self)
@@ -109,16 +145,17 @@ impl Grid
 			self.wind_more[r] = blow_m(self.wind_more[r], self.walls[r]);
 		}
 
-		let mut below = 0;
-		// We do not need to move back to the starting position, so we can
-		// skip updating self.presence[0] and safely use r - 1.
-		for r in (1..self.height).rev()
+		let mut above = 0;
+		for r in 0..self.height
 		{
 			// We can move in four directions or stay still.
 			let current = self.presence[r];
-			self.presence[r] |=
-				self.presence[r - 1] | (current >> 1) | (current << 1) | below;
-			below = current;
+			self.presence[r] |= above | (current >> 1) | (current << 1);
+			if r + 1 < self.height
+			{
+				self.presence[r] |= self.presence[r + 1];
+			}
+			above = current;
 			// The example makes it clear that you can brave the storm by
 			// moving right through it, as long as you don't end up in one.
 			let obstacle =
@@ -198,5 +235,11 @@ mod tests
 	fn one_provided()
 	{
 		assert_eq!(one(PROVIDED), 18);
+	}
+
+	#[test]
+	fn two_provided()
+	{
+		assert_eq!(two(PROVIDED), 54);
 	}
 }
