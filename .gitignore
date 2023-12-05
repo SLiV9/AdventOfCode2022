@@ -14,3 +14,7 @@
 # core dumps
 /*core*
 /*.out.*
+
+# input files
+src/bin/*/input*.txt
+src/bin/*/provided*.txt
